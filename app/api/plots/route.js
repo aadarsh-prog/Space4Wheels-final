@@ -1,68 +1,44 @@
 import { NextResponse } from "next/server"
+import { getPlotsByOwnerId, createPlot } from "@/lib/firebase/database/plots" 
 
+// GET: Fetch plots (optionally filtered by ownerId)
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const ownerId = searchParams.get("ownerId")
+       
+    let plotsResult
 
-    // In a real app, you would fetch plots from Firestore
-    // For demo purposes, we'll return mock data
-    const plots = [
-      {
-        id: "plot1",
-        name: "Downtown Parking",
-        address: "123 Main St, Downtown",
-        description: "Conveniently located parking in the heart of downtown.",
-        price: 5,
-        availableSlots: 8,
-        totalSlots: 15,
-        ownerId: "owner123",
-        ownerName: "John Owner",
-        images: ["/placeholder.svg?height=300&width=500"],
-        features: ["24/7 Access", "Security Cameras"],
-        createdAt: "2023-01-01T00:00:00.000Z",
-        totalBookings: 45,
-      },
-      {
-        id: "plot2",
-        name: "Central Mall Parking",
-        address: "456 Market Ave, Central",
-        description: "Parking near the central mall with easy access.",
-        price: 7,
-        availableSlots: 12,
-        totalSlots: 30,
-        ownerId: "owner123",
-        ownerName: "John Owner",
-        images: ["/placeholder.svg?height=300&width=500"],
-        features: ["24/7 Access", "Covered Parking"],
-        createdAt: "2023-01-15T00:00:00.000Z",
-        totalBookings: 32,
-      },
-    ]
+    if (ownerId) {
+      plotsResult = await getPlotsByOwnerId(ownerId)
+    } else {
+      // Optional: you can create another method to fetch all plots
+      plotsResult = await getPlotsByOwnerId("") // Will return empty or fail if ownerId is empty
+    }
 
-    // Filter by owner if ownerId is provided
-    const filteredPlots = ownerId ? plots.filter((plot) => plot.ownerId === ownerId) : plots
+    if (!plotsResult.success) {
+      throw new Error(plotsResult.error || "Error fetching plots")
+    }
 
-    return NextResponse.json(filteredPlots)
+    return NextResponse.json(plotsResult.data)
   } catch (error) {
     console.error("Error fetching plots:", error)
     return NextResponse.json({ error: "Failed to fetch plots" }, { status: 500 })
   }
 }
 
+// POST: Create a new plot
 export async function POST(request) {
   try {
     const plotData = await request.json()
 
-    // In a real app, you would add the plot to Firestore
-    // For demo purposes, we'll just return the data with an ID
-    const newPlot = {
-      id: `plot${Date.now()}`,
-      ...plotData,
-      createdAt: new Date().toISOString(),
+    const result = await createPlot(plotData)
+
+    if (!result.success) {
+      throw new Error(result.error || "Error creating plot")
     }
 
-    return NextResponse.json(newPlot, { status: 201 })
+    return NextResponse.json(result.data, { status: 201 })
   } catch (error) {
     console.error("Error creating plot:", error)
     return NextResponse.json({ error: "Failed to create plot" }, { status: 500 })

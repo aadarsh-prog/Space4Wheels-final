@@ -1,5 +1,5 @@
 "use client"
-
+import { useEffect } from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { z } from "zod"
@@ -40,6 +40,9 @@ export default function AddPlotPage() {
   const [images, setImages] = useState([])
   const [imageUrls, setImageUrls] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [latitude, setLatitude] = useState(null)
+const [longitude, setLongitude] = useState(null)
+
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -51,6 +54,32 @@ export default function AddPlotPage() {
       totalSlots: 0,
     },
   })
+
+  useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setLatitude(position.coords.latitude)
+          setLongitude(position.coords.longitude)
+        },
+        (error) => {
+          console.error("Geolocation error:", error)
+          toast({
+            variant: "destructive",
+            title: "Location Error",
+            description: "We couldn't get your location automatically.",
+          })
+        }
+      )
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Unsupported",
+        description: "Geolocation is not supported by your browser.",
+      })
+    }
+  }, [])
+  
 
   const handleImageChange = (e) => {
     if (e.target.files) {
@@ -103,11 +132,18 @@ export default function AddPlotPage() {
         features: [],
         reviews: [],
         createdAt: new Date().toISOString(),
+        location: latitude && longitude ? { lat: latitude, lng: longitude } : null,
       }
-
-      console.log("Adding plot to Firestore:", plotData)
-      // e.g. await addDoc(collection(db, "plots"), plotData)
-
+      
+      const response = await fetch("/api/plots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(plotData),
+      })
+  
+      if (!response.ok) {
+        throw new Error("API Error")
+      }
       toast({
         title: "Plot Added Successfully",
         description: "Your parking plot has been added and is now available for booking.",
@@ -243,7 +279,16 @@ export default function AddPlotPage() {
                           />
                         </label>
                       </div>
-
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+  <div>
+    <FormLabel>Latitude</FormLabel>
+    <Input value={latitude ?? "Loading..."} readOnly />
+  </div>
+  <div>
+    <FormLabel>Longitude</FormLabel>
+    <Input value={longitude ?? "Loading..."} readOnly />
+  </div>
+</div>   
                       {imageUrls.length > 0 && (
                         <div className="mt-4 grid grid-cols-2 gap-2">
                           {imageUrls.map((url, index) => (

@@ -1,72 +1,226 @@
-import { useEffect, useRef, useState } from "react";
+"use client" // Enables client-side rendering in Next.js
 
+// Importing required hooks and components
+import { useState, useCallback, useRef, useEffect } from "react"
+import {
+  GoogleMap,
+  useJsApiLoader,
+  Marker,
+  InfoWindow,
+  TrafficLayer,
+  BicyclingLayer,
+  TransitLayer,
+} from "@react-google-maps/api"
+
+// Style for the map container
+const mapContainerStyle = {
+  width: "100%",
+  height: "100%",
+  borderRadius: "0.375rem", // Rounded corners
+}
+
+// Default map center (New York City)
+const defaultCenter = {
+  lat: 40.7128,
+  lng: -74.006,
+}
+
+// Google Maps libraries needed
+const libraries = ["places", "drawing", "geometry", "visualization"]
+
+// Optional map styling (removes business POIs and tweaks transit icons)
+const mapStyles = [
+  {
+    featureType: "poi.business",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "labels.icon",
+    stylers: [{ visibility: "on" }],
+  },
+]
+
+// Main Map component
 export function MapComponent({ plots, selectedPlotId, onSelectPlot }) {
-  const mapRef = useRef(null);
-  const [map, setMap] = useState(null);
-  const [markers, setMarkers] = useState([]);
-  const [infoWindow, setInfoWindow] = useState(null);
+  // Load Google Maps API
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    libraries,
+  })
 
-  // Initialize Google Maps
-  useEffect(() => {
-    // For demo purposes, we'll use a placeholder for the Google Maps API
-    // In a real application, you would use your actual API key
-    const initMap = () => {
-      if (!mapRef.current) return;
+  // React states
+  const [map, setMap] = useState(null) // Reference to the map instance
+  const [activeMarker, setActiveMarker] = useState(null) // Currently open InfoWindow
+  const [mapLayers, setMapLayers] = useState({
+    traffic: false,
+    transit: false,
+    bicycling: false,
+  })
 
-      // Create a div that simulates the map for the demo
-      const mapDiv = document.createElement("div");
-      mapDiv.style.width = "100%";
-      mapDiv.style.height = "100%";
-      mapDiv.style.backgroundColor = "#e5e7eb";
-      mapDiv.style.position = "relative";
-      mapDiv.style.overflow = "hidden";
-      mapDiv.innerHTML = `
-        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
-          <p style="margin-bottom: 10px; font-weight: bold;">Google Maps would appear here</p>
-          <p style="font-size: 14px; color: #6b7280;">This is a placeholder for the Google Maps component</p>
-          <p style="font-size: 12px; margin-top: 10px; color: #6b7280;">In a real application, you would use the Google Maps JavaScript API</p>
-        </div>
-      `;
+  const mapRef = useRef(null) // Ref to access the map outside of React state
 
-      // Clear any existing content and append the map div
-      while (mapRef.current.firstChild) {
-        mapRef.current.removeChild(mapRef.current.firstChild);
+  // Function to run when map loads
+  const onLoad = useCallback(
+    (map) => {
+      mapRef.current = map
+      setMap(map)
+
+      // Adjust the map bounds to fit all plots
+      if (plots && plots.length > 0) {
+        const bounds = new window.google.maps.LatLngBounds()
+        plots.forEach((plot) => {
+          bounds.extend({ lat: plot.lat, lng: plot.lng })
+        })
+        map.fitBounds(bounds)
+
+        // Zoom in slightly if only one plot
+        if (plots.length === 1) {
+          map.setZoom(15)
+        }
       }
-      mapRef.current.appendChild(mapDiv);
+    },
+    [plots],
+  )
 
-      // Add plot markers to the map
-      plots.forEach((plot) => {
-        const marker = document.createElement("div");
-        marker.style.position = "absolute";
-        marker.style.width = "20px";
-        marker.style.height = "20px";
-        marker.style.borderRadius = "50%";
-        marker.style.backgroundColor = selectedPlotId === plot.id ? "#f97316" : "#3b82f6";
-        marker.style.border = "2px solid white";
-        marker.style.left = `${Math.random() * 80 + 10}%`;
-        marker.style.top = `${Math.random() * 80 + 10}%`;
-        marker.style.transform = "translate(-50%, -50%)";
-        marker.style.cursor = "pointer";
-        marker.style.zIndex = "10";
-        marker.title = plot.name;
-        marker.dataset.id = plot.id;
-        marker.addEventListener("click", () => onSelectPlot(plot.id));
+  // Cleanup when map unmounts
+  const onUnmount = useCallback(() => {
+    setMap(null)
+  }, [])
 
-        mapDiv.appendChild(marker);
-      });
-    };
+  // When a marker is clicked
+  const handleMarkerClick = (plotId) => {
+    onSelectPlot(plotId) // Trigger parent handler
+    setActiveMarker(plotId) // Open the InfoWindow
+  }
 
-    initMap();
-  }, [plots, selectedPlotId, onSelectPlot]);
+  // Center and zoom to the selected plot when selectedPlotId changes
+  useEffect(() => {
+    if (map && selectedPlotId) {
+      const selectedPlot = plots.find((plot) => plot.id === selectedPlotId)
+      if (selectedPlot) {
+        map.panTo({ lat: selectedPlot.lat, lng: selectedPlot.lng })
+        map.setZoom(16)
+      }
+    }
+  }, [selectedPlotId, map, plots])
+
+  // Toggle individual map layers (traffic, transit, bicycling)
+  const toggleLayer = (layerName) => {
+    setMapLayers((prev) => ({
+      ...prev,
+      [layerName]: !prev[layerName],
+    }))
+  }
+
+  // Error handling if map fails to load
+  if (loadError) {
+    return (
+      <div className="h-full w-full bg-muted flex items-center justify-center">
+        <div className="text-center p-4">
+          <p className="text-lg font-medium mb-2 text-red-500">Error loading Google Maps</p>
+          <p className="text-sm text-muted-foreground">
+            There was an error loading Google Maps. Please try again later.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading state while Google Maps is loading
+  if (!isLoaded) {
+    return (
+      <div className="h-full w-full bg-muted flex items-center justify-center">
+        <div className="text-center p-4">
+          <p className="text-lg font-medium mb-2">Loading Google Maps...</p>
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div ref={mapRef} className="h-full w-full bg-muted flex items-center justify-center">
-      <div className="text-center p-4">
-        <p className="text-lg font-medium mb-2">Google Maps Integration</p>
-        <p className="text-sm text-muted-foreground">
-          In a production environment, this would display an interactive Google Map with parking plot markers.
-        </p>
+    <div className="relative h-full">
+      {/* Render the Google Map */}
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={defaultCenter}
+        zoom={12}
+        onLoad={onLoad}
+        onUnmount={onUnmount}
+        options={{
+          fullscreenControl: true,
+          streetViewControl: true,
+          mapTypeControl: true,
+          zoomControl: true,
+          mapTypeControlOptions: {
+            position: window.google.maps.ControlPosition.TOP_RIGHT,
+          },
+          styles: mapStyles,
+        }}
+      >
+        {/* Render optional layers */}
+        {mapLayers.traffic && <TrafficLayer />}
+        {mapLayers.transit && <TransitLayer />}
+        {mapLayers.bicycling && <BicyclingLayer />}
+
+        {/* Render all plot markers */}
+        {plots.map((plot) => (
+          <Marker
+            key={plot.id}
+            position={{ lat: plot.lat, lng: plot.lng }} 
+            onClick={() => handleMarkerClick(plot.id)}
+            animation={window.google.maps.Animation.DROP}
+            icon={{
+              url: selectedPlotId === plot.id ? "/marker-selected.svg" : "/marker-default.svg",
+              scaledSize: new window.google.maps.Size(40, 40),
+            }}
+          >
+            {/* Show InfoWindow if this marker is active */}
+            {activeMarker === plot.id && (
+              <InfoWindow onCloseClick={() => setActiveMarker(null)}>
+                <div className="p-2">
+                  <h3 className="font-medium text-sm">{plot.name}</h3>
+                  <p className="text-xs text-gray-600">${plot.price}/hour</p>
+                  <p className="text-xs text-gray-600">
+                    {plot.availableSlots}/{plot.totalSlots} spots available
+                  </p>
+                </div>
+              </InfoWindow>
+            )}
+          </Marker>
+        ))}
+      </GoogleMap>
+
+      {/* Buttons to toggle map layers */}
+      <div className="absolute top-4 left-4 bg-white p-2 rounded-md shadow-md z-10">
+        <div className="flex flex-col space-y-2">
+          <button
+            className={`px-2 py-1 text-xs rounded ${
+              mapLayers.traffic ? "bg-primary text-white" : "bg-gray-200"
+            }`}
+            onClick={() => toggleLayer("traffic")}
+          >
+            Traffic
+          </button>
+          <button
+            className={`px-2 py-1 text-xs rounded ${
+              mapLayers.transit ? "bg-primary text-white" : "bg-gray-200"
+            }`}
+            onClick={() => toggleLayer("transit")}
+          >
+            Transit
+          </button>
+          <button
+            className={`px-2 py-1 text-xs rounded ${
+              mapLayers.bicycling ? "bg-primary text-white" : "bg-gray-200"
+            }`}
+            onClick={() => toggleLayer("bicycling")}
+          >
+            Bicycling
+          </button>
+        </div>
       </div>
     </div>
-  );
+  )
 }

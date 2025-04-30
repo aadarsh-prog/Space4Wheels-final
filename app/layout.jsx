@@ -15,15 +15,17 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <>
-      <FirebaseProvider>
-        <AuthProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            {children}
-            <Toaster />
-          </ThemeProvider>
-        </AuthProvider>
-      </FirebaseProvider>
-    </>
+    <html lang="en">
+      <body className={inter.className}>
+        <FirebaseProvider>
+          <AuthProvider>
+            <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+              {children}
+              <Toaster />
+            </ThemeProvider>
+          </AuthProvider>
+        </FirebaseProvider>
+      </body>
+    </html>
   )
 }

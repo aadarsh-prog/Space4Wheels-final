@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import {
   getAuth,
   onAuthStateChanged,
@@ -28,6 +28,7 @@ export function AuthProvider({ children }) {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Get user role from Firestore
         try {
           const userDoc = await getDoc(doc(db, "users", firebaseUser.uid))
           const userData = userDoc.data()
@@ -80,8 +81,10 @@ export function AuthProvider({ children }) {
       const auth = getAuth(app)
       const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password)
 
+      // Update profile with display name
       await updateProfile(firebaseUser, { displayName: name })
 
+      // Store additional user data in Firestore
       await setDoc(doc(db, "users", firebaseUser.uid), {
         uid: firebaseUser.uid,
         email,

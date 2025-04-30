@@ -20,6 +20,7 @@ export default function DashboardPage() {
     if (user) {
       const fetchUserData = async () => {
         try {
+         
           const userDoc = await fetch(`/api/users/${user.uid}`);
           const userData = await userDoc.json();
           setUserRole(userData.role || "user");

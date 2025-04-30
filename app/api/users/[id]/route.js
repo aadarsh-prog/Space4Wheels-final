@@ -1,23 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from "next/server"
+import { getUserById } from "@/lib/firebase/database/users" // <-- correct import
 
 export async function GET(request, { params }) {
   try {
-    // In a real app, you would fetch user data from Firestore
-    // For demo purposes, we'll return mock data
-    const userId = params.id;
+    const { id } = await params
+    const result = await getUserById(id)
 
-    // Mock user data
-    const userData = {
-      uid: userId,
-      name: "John Doe",
-      email: "john@example.com",
-      role: "owner", // or "owner"
-      createdAt: "2023-01-01T00:00:00.000Z",
-    };
+    console.log("getting request ")
 
-    return NextResponse.json(userData);
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 404 })
+    }
+
+    return NextResponse.json(result.data)
   } catch (error) {
-    console.error("Error fetching user:", error);
-    return NextResponse.json({ error: "Failed to fetch user data" }, { status: 500 });
+    console.error("Unhandled error fetching user:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

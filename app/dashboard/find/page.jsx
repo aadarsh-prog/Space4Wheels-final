@@ -10,7 +10,6 @@ import { Slider } from "@/components/ui/slider"
 import { MapComponent } from "@/components/map-component"
 import { Search, MapPin, List } from "lucide-react"
 
-// Dummy data for parking plots
 const dummyPlots = [
   {
     id: "plot1",
@@ -76,17 +75,26 @@ export default function FindParkingPage() {
   const [filteredPlots, setFilteredPlots] = useState(dummyPlots)
   const [selectedPlot, setSelectedPlot] = useState(null)
 
-  // Filter plots based on search query, distance, and price
   useEffect(() => {
     const filtered = dummyPlots.filter(
       (plot) =>
         (plot.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           plot.address.toLowerCase().includes(searchQuery.toLowerCase())) &&
         plot.distance <= maxDistance &&
-        plot.price <= maxPrice,
+        plot.price <= maxPrice
     )
     setFilteredPlots(filtered)
   }, [searchQuery, maxDistance, maxPrice])
+
+  const handleSelectPlot = (plotId) => {
+    setSelectedPlot(plotId)
+    if (window.innerWidth < 1024) {
+      const element = document.getElementById(`plot-${plotId}`)
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" })
+      }
+    }
+  }
 
   return (
     <div className="container mx-auto">
@@ -152,8 +160,9 @@ export default function FindParkingPage() {
                   filteredPlots.map((plot) => (
                     <Card
                       key={plot.id}
+                      id={`plot-${plot.id}`}
                       className={`cursor-pointer transition-all ${selectedPlot === plot.id ? "border-primary" : ""}`}
-                      onClick={() => setSelectedPlot(plot.id)}
+                      onClick={() => handleSelectPlot(plot.id)}
                     >
                       <CardHeader className="pb-2">
                         <CardTitle className="text-lg">{plot.name}</CardTitle>
@@ -214,7 +223,7 @@ export default function FindParkingPage() {
                       <MapComponent
                         plots={filteredPlots}
                         selectedPlotId={selectedPlot}
-                        onSelectPlot={(id) => setSelectedPlot(id)}
+                        onSelectPlot={handleSelectPlot}
                       />
                     </div>
                   </CardContent>

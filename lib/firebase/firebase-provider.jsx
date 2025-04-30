@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import { initializeApp, getApps, getApp } from "firebase/app"
 import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
@@ -48,4 +48,24 @@ export const useFirebase = () => {
     throw new Error("useFirebase must be used within a FirebaseProvider")
   }
   return context
+}
+
+export const useFirebaseApp = () => {
+  const { app } = useFirebase()
+  return app
+}
+
+export const useFirestore = () => {
+  const { db } = useFirebase()
+  return db
+}
+
+export const useStorage = () => {
+  const { storage } = useFirebase()
+  return storage
+}
+
+export const db = () => {
+  const { db } = useFirebase()
+  return db
 }

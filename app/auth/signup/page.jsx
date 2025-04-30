@@ -57,7 +57,7 @@ export default function SignupPage() {
     try {
       setIsLoading(true)
       await signUp(values.email, values.password, values.name, values.role)
-      router.push("/dashboard")
+      router.push("/auth/login")
     } catch (error) {
       console.error("Signup error:", error)
       setIsLoading(false)
