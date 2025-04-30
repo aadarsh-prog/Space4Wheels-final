@@ -19,12 +19,6 @@ const mapContainerStyle = {
   borderRadius: "0.375rem", // Rounded corners
 }
 
-// Default map center (New York City)
-const defaultCenter = {
-  lat: 40.7128,
-  lng: -74.006,
-}
-
 // Google Maps libraries needed
 const libraries = ["places", "drawing", "geometry", "visualization"]
 
@@ -57,6 +51,14 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot }) {
     transit: false,
     bicycling: false,
   })
+  const [latitude, setLatitude] = useState(null)
+  const [longitude, setLongitude] = useState(null)
+  
+  // Default map center (New York City)
+  const defaultCenter = {
+  lat: latitude,
+  lng: longitude,
+}
 
   const mapRef = useRef(null) // Ref to access the map outside of React state
 
@@ -87,6 +89,10 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot }) {
   const onUnmount = useCallback(() => {
     setMap(null)
   }, [])
+  
+  useEffect(()=>{
+    console.log(latitude, longitude)
+  },[latitude, longitude])
 
   // When a marker is clicked
   const handleMarkerClick = (plotId) => {
@@ -104,6 +110,33 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot }) {
       }
     }
   }, [selectedPlotId, map, plots])
+
+
+    useEffect(() => {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            setLatitude(position.coords.latitude)
+            setLongitude(position.coords.longitude)
+          },
+          (error) => {
+            console.error("Geolocation error:", error)
+            toast({
+              variant: "destructive",
+              title: "Location Error",
+              description: "We couldn't get your location automatically.",
+            })
+          }
+        )
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Unsupported",
+          description: "Geolocation is not supported by your browser.",
+        })
+      }
+    }, [])
+    
 
   // Toggle individual map layers (traffic, transit, bicycling)
   const toggleLayer = (layerName) => {

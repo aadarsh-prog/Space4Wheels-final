@@ -8,15 +8,15 @@ initAdmin()
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get("userId")
     const plotId = searchParams.get("plotId")
+    const userId = searchParams.get("userId")
 
     let result
 
-    if (userId) {
-      result = await adminDbService.bookings.getBookingsByUserId(userId)
-    } else if (plotId) {
-      result = await adminDbService.bookings.getBookingsByPlotId(plotId)
+    if (plotId) {
+      result = await adminDbService.reviews.getReviewsByPlotId(plotId)
+    } else if (userId) {
+      result = await adminDbService.reviews.getReviewsByUserId(userId)
     } else {
       return NextResponse.json({ error: "Missing query parameters" }, { status: 400 })
     }
@@ -27,8 +27,8 @@ export async function GET(request) {
 
     return NextResponse.json(result.data)
   } catch (error) {
-    console.error("Error fetching bookings:", error)
-    return NextResponse.json({ error: "Failed to fetch bookings: " + error.message }, { status: 500 })
+    console.error("Error fetching reviews:", error)
+    return NextResponse.json({ error: "Failed to fetch reviews: " + error.message }, { status: 500 })
   }
 }
 
@@ -40,11 +40,11 @@ export async function POST(request) {
     const data = await request.json()
 
     // Validate required fields
-    if (!data.userId || !data.plotId || !data.date || !data.startTime || !data.endTime) {
+    if (!data.userId || !data.plotId || !data.rating) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const result = await adminDbService.bookings.createBooking(data)
+    const result = await adminDbService.reviews.createReview(data)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 })
@@ -52,7 +52,7 @@ export async function POST(request) {
 
     return NextResponse.json(result.data, { status: 201 })
   } catch (error) {
-    console.error("Error creating booking:", error)
-    return NextResponse.json({ error: "Failed to create booking: " + error.message }, { status: 500 })
+    console.error("Error creating review:", error)
+    return NextResponse.json({ error: "Failed to create review: " + error.message }, { status: 500 })
   }
 }

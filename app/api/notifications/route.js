@@ -9,17 +9,13 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get("userId")
-    const plotId = searchParams.get("plotId")
+    const limit = searchParams.get("limit") ? Number.parseInt(searchParams.get("limit")) : 20
 
-    let result
-
-    if (userId) {
-      result = await adminDbService.bookings.getBookingsByUserId(userId)
-    } else if (plotId) {
-      result = await adminDbService.bookings.getBookingsByPlotId(plotId)
-    } else {
-      return NextResponse.json({ error: "Missing query parameters" }, { status: 400 })
+    if (!userId) {
+      return NextResponse.json({ error: "Missing userId parameter" }, { status: 400 })
     }
+
+    const result = await adminDbService.notifications.getNotificationsByUserId(userId, limit)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 })
@@ -27,8 +23,8 @@ export async function GET(request) {
 
     return NextResponse.json(result.data)
   } catch (error) {
-    console.error("Error fetching bookings:", error)
-    return NextResponse.json({ error: "Failed to fetch bookings: " + error.message }, { status: 500 })
+    console.error("Error fetching notifications:", error)
+    return NextResponse.json({ error: "Failed to fetch notifications: " + error.message }, { status: 500 })
   }
 }
 
@@ -40,11 +36,11 @@ export async function POST(request) {
     const data = await request.json()
 
     // Validate required fields
-    if (!data.userId || !data.plotId || !data.date || !data.startTime || !data.endTime) {
+    if (!data.userId || !data.type || !data.title || !data.message) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const result = await adminDbService.bookings.createBooking(data)
+    const result = await adminDbService.notifications.createNotification(data)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 })
@@ -52,7 +48,7 @@ export async function POST(request) {
 
     return NextResponse.json(result.data, { status: 201 })
   } catch (error) {
-    console.error("Error creating booking:", error)
-    return NextResponse.json({ error: "Failed to create booking: " + error.message }, { status: 500 })
+    console.error("Error creating notification:", error)
+    return NextResponse.json({ error: "Failed to create notification: " + error.message }, { status: 500 })
   }
 }

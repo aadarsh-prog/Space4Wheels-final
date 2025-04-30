@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from "next/server"
 
 export async function GET(request) {
   try {
@@ -38,11 +38,11 @@ export async function GET(request) {
         lat: 40.7148,
         lng: -74.001,
       },
-    ];
+    ]
 
-    return NextResponse.json(nearbyPlots);
+    return NextResponse.json(nearbyPlots)
   } catch (error) {
-    console.error("Error fetching nearby plots:", error);
-    return NextResponse.json({ error: "Failed to fetch nearby plots" }, { status: 500 });
+    console.error("Error fetching nearby plots:", error)
+    return NextResponse.json({ error: "Failed to fetch nearby plots" }, { status: 500 })
   }
 }

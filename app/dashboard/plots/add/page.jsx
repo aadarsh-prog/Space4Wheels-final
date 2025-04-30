@@ -142,6 +142,8 @@ const [longitude, setLongitude] = useState(null)
       })
   
       if (!response.ok) {
+        console.log("consoling error :")
+        console.log(response)
         throw new Error("API Error")
       }
       toast({
