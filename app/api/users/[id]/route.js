@@ -10,6 +10,7 @@ export async function GET(request, { params }) {
     const resolvedParams = await params;
     const userId = resolvedParams.id;
     
+    
     // Use Admin SDK to get user data
     const result = await adminDbService.users.getUserById(userId)
 
