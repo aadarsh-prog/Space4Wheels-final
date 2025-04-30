@@ -7,8 +7,9 @@ initAdmin()
 
 export async function GET(request, { params }) {
   try {
-    const userId =await params.id
-
+    const resolvedParams = await params;
+    const userId = resolvedParams.id;
+    
     // Use Admin SDK to get user data
     const result = await adminDbService.users.getUserById(userId)
 
