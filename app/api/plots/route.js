@@ -35,6 +35,7 @@ export async function POST(request) {
     const result = await createPlot(plotData)
 
     if (!result.success) {
+      console.log(result.error)
       throw new Error(result.error || "Error creating plot")
     }
 

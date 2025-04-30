@@ -27,6 +27,7 @@ export default function DashboardPage() {
 
           if (userData.role === "owner") {
             const plotsResponse = await fetch(`/api/plots?ownerId=${user.uid}`);
+            if (!plotsResponse.ok) throw new Error("Failed to fetch plots");
             const plotsData = await plotsResponse.json();
             setUserPlots(plotsData);
           } else {
