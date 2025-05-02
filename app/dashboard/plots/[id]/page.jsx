@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -10,51 +10,72 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Calendar } from "@/components/ui/calendar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { MapPin, Clock, Car, Info } from "lucide-react"
+import { MapPin, Clock, Car, Info, Star, Loader2 } from "lucide-react"
+import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api"
+import { useAuth } from "@/lib/firebase/auth-context"
+import { useDatabase } from "@/lib/hooks/use-database"
+import { PaymentForm } from "@/components/payment/payment-form"
 
-// Dummy plot data
-const dummyPlot = {
-  id: "plot1",
-  name: "Downtown Parking",
-  address: "123 Main St, Downtown",
-  description: "Conveniently located parking in the heart of downtown. Easy access to shops, restaurants, and offices.",
-  price: 5,
-  availableSlots: 8,
-  totalSlots: 15,
-  distance: 0.5,
-  lat: 40.7128,
-  lng: -74.006,
-  images: [
-    "/placeholder.svg?height=300&width=500",
-    "/placeholder.svg?height=300&width=500",
-    "/placeholder.svg?height=300&width=500",
-  ],
-  features: ["24/7 Access", "Security Cameras", "Covered Parking", "Well Lit", "EV Charging Available"],
-  reviews: [
-    {
-      id: "review1",
-      user: "John D.",
-      rating: 4,
-      comment: "Great location, easy to find and use.",
-      date: "2023-04-15",
-    },
-    {
-      id: "review2",
-      user: "Sarah M.",
-      rating: 5,
-      comment: "Very convenient and safe. Will use again!",
-      date: "2023-04-10",
-    },
-  ],
+const mapContainerStyle = {
+  width: "100%",
+  height: "100%",
+  borderRadius: "0.375rem",
 }
 
 export default function PlotDetailPage() {
+  const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { user } = useAuth()
+  const { getPlotById, getReviewsByPlotId, createBooking, processPayment, loading } = useDatabase()
+
+  const [plot, setPlot] = useState(null)
+  const [reviews, setReviews] = useState([])
   const [date, setDate] = useState(new Date())
   const [startTime, setStartTime] = useState("09:00")
   const [endTime, setEndTime] = useState("11:00")
+  const [isLoading, setIsLoading] = useState(true)
   const [isBooking, setIsBooking] = useState(false)
+  const [showPayment, setShowPayment] = useState(false)
+  const [bookingDetails, setBookingDetails] = useState(null)
+
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    libraries: ["places"],
+  })
+
+  useEffect(() => {
+    const fetchPlotDetails = async () => {
+      if (!params.id) return
+
+      try {
+        setIsLoading(true)
+
+        // Fetch plot details
+        const plotData = await getPlotById(params.id)
+        if (plotData) {
+          setPlot(plotData)
+
+          // Fetch reviews
+          const reviewsData = await getReviewsByPlotId(params.id)
+          if (reviewsData) {
+            setReviews(reviewsData)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching plot details:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load plot details.",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchPlotDetails()
+  }, [params.id, getPlotById, getReviewsByPlotId, toast])
 
   // Generate time slots for selection
   const timeSlots = Array.from({ length: 24 }, (_, i) => {
@@ -62,33 +83,182 @@ export default function PlotDetailPage() {
     return `${hour}:00`
   })
 
-  const handleBooking = async () => {
+  const calculateDuration = () => {
+    const start = Number.parseInt(startTime.split(":")[0])
+    const end = Number.parseInt(endTime.split(":")[0])
+    return end > start ? end - start : 24 - start + end
+  }
+
+  const calculatePrice = () => {
+    if (!plot) return 0
+    const duration = calculateDuration()
+    return plot.price * duration
+  }
+
+  const handleBookNow = () => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Required",
+        description: "Please log in to book a parking spot.",
+      })
+      router.push("/auth/login")
+      return
+    }
+
+    if (!date) {
+      toast({
+        variant: "destructive",
+        title: "Date Required",
+        description: "Please select a date for your booking.",
+      })
+      return
+    }
+
+    const duration = calculateDuration()
+    if (duration <= 0) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Time Selection",
+        description: "End time must be after start time.",
+      })
+      return
+    }
+
+    // Create booking details
+    const bookingData = {
+      userId: user.uid,
+      userName: user.displayName || user.email,
+      plotId: plot.id,
+      plotName: plot.name,
+      plotAddress: plot.address,
+      date: date.toISOString().split("T")[0],
+      startTime,
+      endTime,
+      duration,
+      price: calculatePrice(),
+    }
+
+    setBookingDetails(bookingData)
+    setShowPayment(true)
+  }
+
+  const handlePaymentComplete = async (paymentDetails) => {
     setIsBooking(true)
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // Create booking
+      const bookingResult = await createBooking({
+        ...bookingDetails,
+        paymentStatus: "pending",
+      })
+
+      if (!bookingResult) {
+        throw new Error("Failed to create booking")
+      }
+
+      // Process payment
+      const paymentResult = await processPayment(bookingResult.id, paymentDetails)
+
+      if (!paymentResult) {
+        throw new Error("Failed to process payment")
+      }
+
       toast({
         title: "Booking Confirmed!",
-        description: `You have successfully booked a parking spot at ${dummyPlot.name} on ${date.toLocaleDateString()} from ${startTime} to ${endTime}.`,
+        description: `You have successfully booked a parking spot at ${plot.name}.`,
       })
-      setIsBooking(false)
+
+      // Redirect to bookings page
       router.push("/dashboard/bookings")
-    }, 1500)
+    } catch (error) {
+      console.error("Error completing booking:", error)
+      toast({
+        variant: "destructive",
+        title: "Booking Failed",
+        description: "There was an error processing your booking. Please try again.",
+      })
+    } finally {
+      setIsBooking(false)
+      setShowPayment(false)
+    }
   }
+
+  const handleCancelPayment = () => {
+    setShowPayment(false)
+    setBookingDetails(null)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8">
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!plot) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <p className="text-red-500">Parking plot not found.</p>
+            <Button className="mt-4" onClick={() => router.push("/dashboard/find")}>
+              Back to Find Parking
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // For demo purposes, use dummy data if needed
+  const displayPlot = {
+    ...plot,
+    images:
+      plot.images && plot.images.length > 0
+        ? plot.images
+        : ["/placeholder.svg?height=300&width=500", "/placeholder.svg?height=300&width=500"],
+    features: plot.features || ["24/7 Access", "Security Cameras", "Covered Parking", "Well Lit"],
+  }
+
+  const displayReviews =
+    reviews.length > 0
+      ? reviews
+      : [
+          {
+            id: "review1",
+            userId: "user1",
+            userName: "John D.",
+            rating: 4,
+            comment: "Great location, easy to find and use.",
+            createdAt: "2023-04-15T00:00:00.000Z",
+          },
+          {
+            id: "review2",
+            userId: "user2",
+            userName: "Sarah M.",
+            rating: 5,
+            comment: "Very convenient and safe. Will use again!",
+            createdAt: "2023-04-10T00:00:00.000Z",
+          },
+        ]
 
   return (
     <div className="container mx-auto">
       <div className="grid gap-6">
         <div className="flex flex-col md:flex-row justify-between items-start gap-4">
           <div>
-            <h1 className="text-3xl font-bold">{dummyPlot.name}</h1>
+            <h1 className="text-3xl font-bold">{displayPlot.name}</h1>
             <p className="text-muted-foreground flex items-center gap-1 mt-1">
               <MapPin className="h-4 w-4" />
-              {dummyPlot.address}
+              {displayPlot.address}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold">${dummyPlot.price}</span>
+            <span className="text-2xl font-bold">${displayPlot.price}</span>
             <span className="text-muted-foreground">/hour</span>
           </div>
         </div>
@@ -99,13 +269,13 @@ export default function PlotDetailPage() {
               <CardContent className="p-0">
                 <Carousel className="w-full">
                   <CarouselContent>
-                    {dummyPlot.images.map((image, index) => (
+                    {displayPlot.images.map((image, index) => (
                       <CarouselItem key={index}>
                         <div className="p-1">
                           <div className="overflow-hidden rounded-lg">
                             <Image
                               src={image || "/placeholder.svg"}
-                              alt={`${dummyPlot.name} - Image ${index + 1}`}
+                              alt={`${displayPlot.name} - Image ${index + 1}`}
                               width={800}
                               height={400}
                               className="aspect-[2/1] w-full object-cover"
@@ -132,7 +302,7 @@ export default function PlotDetailPage() {
                 <Card>
                   <CardContent className="pt-6">
                     <div className="space-y-4">
-                      <p>{dummyPlot.description}</p>
+                      <p>{displayPlot.description}</p>
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex items-center gap-2">
@@ -140,7 +310,7 @@ export default function PlotDetailPage() {
                           <div>
                             <p className="text-sm font-medium">Available Slots</p>
                             <p className="text-sm text-muted-foreground">
-                              {dummyPlot.availableSlots} of {dummyPlot.totalSlots}
+                              {displayPlot.availableSlots} of {displayPlot.totalSlots}
                             </p>
                           </div>
                         </div>
@@ -161,7 +331,7 @@ export default function PlotDetailPage() {
                 <Card>
                   <CardContent className="pt-6">
                     <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {dummyPlot.features.map((feature, index) => (
+                      {displayPlot.features.map((feature, index) => (
                         <li key={index} className="flex items-center gap-2">
                           <div className="h-2 w-2 rounded-full bg-primary" />
                           {feature}
@@ -175,29 +345,27 @@ export default function PlotDetailPage() {
               <TabsContent value="reviews" className="mt-4">
                 <Card>
                   <CardContent className="pt-6">
-                    {dummyPlot.reviews.length === 0 ? (
+                    {displayReviews.length === 0 ? (
                       <p className="text-center text-muted-foreground">No reviews yet.</p>
                     ) : (
                       <div className="space-y-4">
-                        {dummyPlot.reviews.map((review) => (
+                        {displayReviews.map((review) => (
                           <div key={review.id} className="border-b pb-4 last:border-0 last:pb-0">
                             <div className="flex justify-between items-start">
                               <div>
-                                <p className="font-medium">{review.user}</p>
-                                <p className="text-sm text-muted-foreground">{review.date}</p>
+                                <p className="font-medium">{review.userName}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {new Date(review.createdAt).toLocaleDateString()}
+                                </p>
                               </div>
                               <div className="flex">
                                 {Array.from({ length: 5 }).map((_, i) => (
-                                  <svg
+                                  <Star
                                     key={i}
                                     className={`h-4 w-4 ${
                                       i < review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
                                     }`}
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                                  </svg>
+                                  />
                                 ))}
                               </div>
                             </div>
@@ -213,86 +381,119 @@ export default function PlotDetailPage() {
           </div>
 
           <div className="space-y-6">
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold mb-4">Book a Parking Spot</h3>
+            {showPayment ? (
+              <PaymentForm
+                amount={calculatePrice()}
+                onPaymentComplete={handlePaymentComplete}
+                onCancel={handleCancelPayment}
+              />
+            ) : (
+              <Card>
+                <CardContent className="pt-6">
+                  <h3 className="text-lg font-semibold mb-4">Book a Parking Spot</h3>
 
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium mb-2">Select Date</p>
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={setDate}
-                      className="border rounded-md"
-                      disabled={(date) => date < new Date()}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <div>
-                      <p className="text-sm font-medium mb-2">Start Time</p>
-                      <Select value={startTime} onValueChange={setStartTime}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select start time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {timeSlots.map((time) => (
-                            <SelectItem key={time} value={time}>
-                              {time}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <p className="text-sm font-medium mb-2">Select Date</p>
+                      <Calendar
+                        mode="single"
+                        selected={date}
+                        onSelect={setDate}
+                        className="border rounded-md"
+                        disabled={(date) => date < new Date()}
+                      />
                     </div>
 
-                    <div>
-                      <p className="text-sm font-medium mb-2">End Time</p>
-                      <Select value={endTime} onValueChange={setEndTime}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select end time" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {timeSlots.map((time) => (
-                            <SelectItem key={time} value={time}>
-                              {time}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium mb-2">Start Time</p>
+                        <Select value={startTime} onValueChange={setStartTime}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select start time" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {timeSlots.map((time) => (
+                              <SelectItem key={time} value={time}>
+                                {time}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-medium mb-2">End Time</p>
+                        <Select value={endTime} onValueChange={setEndTime}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select end time" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {timeSlots.map((time) => (
+                              <SelectItem key={time} value={time}>
+                                {time}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-4 mt-4">
+                      <div className="flex justify-between mb-2">
+                        <span>Parking Fee</span>
+                        <span>
+                          ${displayPlot.price} x {calculateDuration()} hours
+                        </span>
+                      </div>
+                      <div className="flex justify-between font-bold text-lg">
+                        <span>Total</span>
+                        <span>${calculatePrice()}</span>
+                      </div>
+                    </div>
+
+                    <Button className="w-full" onClick={handleBookNow} disabled={isBooking || !date}>
+                      {isBooking ? "Processing..." : "Book Now"}
+                    </Button>
+
+                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <p>You won't be charged until you confirm your booking.</p>
                     </div>
                   </div>
-
-                  <div className="border-t pt-4 mt-4">
-                    <div className="flex justify-between mb-2">
-                      <span>Parking Fee</span>
-                      <span>${dummyPlot.price} x 2 hours</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-lg">
-                      <span>Total</span>
-                      <span>${dummyPlot.price * 2}</span>
-                    </div>
-                  </div>
-
-                  <Button className="w-full" onClick={handleBooking} disabled={isBooking || !date}>
-                    {isBooking ? "Processing..." : "Book Now"}
-                  </Button>
-
-                  <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                    <p>You won't be charged until you confirm your booking.</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardContent className="pt-6">
                 <h3 className="text-lg font-semibold mb-4">Location</h3>
-                <div className="aspect-video bg-muted rounded-md overflow-hidden flex items-center justify-center">
-                  <div className="text-center p-4">
-                    <p className="text-sm text-muted-foreground">Map showing the exact location would appear here</p>
-                  </div>
+                <div className="aspect-video bg-muted rounded-md overflow-hidden">
+                  {isLoaded ? (
+                    <GoogleMap
+                      mapContainerStyle={mapContainerStyle}
+                      center={{ lat: displayPlot.lat, lng: displayPlot.lng }}
+                      zoom={15}
+                      options={{
+                        fullscreenControl: false,
+                        streetViewControl: false,
+                        mapTypeControl: false,
+                      }}
+                    >
+                      <Marker
+                        position={{ lat: displayPlot.lat, lng: displayPlot.lng }}
+                        icon={{
+                          url: "/marker-selected.svg",
+                          scaledSize: new window.google.maps.Size(40, 40),
+                        }}
+                      />
+                    </GoogleMap>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center p-4">
+                        <p className="text-sm text-muted-foreground">Loading map...</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

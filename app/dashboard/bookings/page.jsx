@@ -1,96 +1,54 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { useAuth } from "@/lib/firebase/auth-context";
-import { Calendar, Clock, MapPin } from "lucide-react";
-
-const dummyBookings = [
-  {
-    id: "booking1",
-    plotId: "plot1",
-    plotName: "Downtown Parking",
-    address: "123 Main St, Downtown",
-    date: "2023-05-15",
-    startTime: "10:00 AM",
-    endTime: "12:00 PM",
-    price: 10,
-    status: "upcoming",
-  },
-  {
-    id: "booking2",
-    plotId: "plot2",
-    plotName: "Central Mall Parking",
-    address: "456 Market Ave, Central",
-    date: "2023-05-10",
-    startTime: "2:00 PM",
-    endTime: "4:00 PM",
-    price: 14,
-    status: "completed",
-  },
-  {
-    id: "booking3",
-    plotId: "plot3",
-    plotName: "City Center Parking",
-    address: "789 Center Blvd, Midtown",
-    date: "2023-04-28",
-    startTime: "9:00 AM",
-    endTime: "11:00 AM",
-    price: 12,
-    status: "completed",
-  },
-];
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useAuth } from "@/lib/firebase/auth-context"
+import { useDatabase } from "@/lib/hooks/use-database"
+import { Calendar, Clock, MapPin, Loader2 } from "lucide-react"
 
 export default function BookingsPage() {
-  const { user } = useAuth();
-  const [bookings, setBookings] = useState(dummyBookings);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth()
+  const { getBookings, loading } = useDatabase()
+  const [bookings, setBookings] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const fetchBookings = async () => {
+      if (!user) return
+
       try {
-        setBookings(dummyBookings);
+        setIsLoading(true)
+        const data = await getBookings({ userId: user.uid })
+        setBookings(data || [])
       } catch (error) {
-        console.error("Error fetching bookings:", error);
+        console.error("Error fetching bookings:", error)
       } finally {
-        setLoading(false);
+        setIsLoading(false)
       }
-    };
+    }
 
     if (user) {
-      fetchBookings();
+      fetchBookings()
     }
-  }, [user]);
+  }, [user, getBookings])
 
-  const upcomingBookings = bookings.filter((booking) => booking.status === "upcoming");
-  const pastBookings = bookings.filter((booking) => booking.status === "completed");
+  // Filter bookings by status
+  const upcomingBookings = bookings.filter((booking) => booking.status === "confirmed" || booking.status === "pending")
 
-  if (loading) {
+  const pastBookings = bookings.filter((booking) => booking.status === "completed" || booking.status === "cancelled")
+
+  if (isLoading || loading) {
     return (
       <div className="container mx-auto">
         <h1 className="text-3xl font-bold mb-6">My Bookings</h1>
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-muted rounded w-48"></div>
-          <div className="h-48 bg-muted rounded"></div>
-          <div className="h-48 bg-muted rounded"></div>
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -121,7 +79,7 @@ export default function BookingsPage() {
                     <CardTitle>{booking.plotName}</CardTitle>
                     <CardDescription className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
-                      {booking.address}
+                      {booking.plotAddress || booking.address}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -177,7 +135,7 @@ export default function BookingsPage() {
                     <CardTitle>{booking.plotName}</CardTitle>
                     <CardDescription className="flex items-center gap-1">
                       <MapPin className="h-3 w-3" />
-                      {booking.address}
+                      {booking.plotAddress || booking.address}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -214,5 +172,5 @@ export default function BookingsPage() {
         </TabsContent>
       </Tabs>
     </div>
-  );
+  )
 }

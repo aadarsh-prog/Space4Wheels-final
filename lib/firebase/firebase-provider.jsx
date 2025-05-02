@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { initializeApp, getApps, getApp } from "firebase/app"
+import { getAuth } from "firebase/auth"
 import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 import { firebaseConfig } from "./firebase-config"
@@ -9,34 +10,27 @@ import { firebaseConfig } from "./firebase-config"
 const FirebaseContext = createContext(null)
 
 export function FirebaseProvider({ children }) {
+  const [initialized, setInitialized] = useState(false)
   const [firebaseApp, setFirebaseApp] = useState(null)
-  const [firestoreDb, setFirestoreDb] = useState(null)
-  const [firebaseStorage, setFirebaseStorage] = useState(null)
+  const [auth, setAuth] = useState(null)
+  const [db, setDb] = useState(null)
+  const [storage, setStorage] = useState(null)
 
   useEffect(() => {
-    let app
-    if (getApps().length === 0) {
-      app = initializeApp(firebaseConfig)
-    } else {
-      app = getApp()
+    try {
+      const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()
+      setFirebaseApp(app)
+      setAuth(getAuth(app))
+      setDb(getFirestore(app))
+      setStorage(getStorage(app))
+      setInitialized(true)
+    } catch (error) {
+      console.error("Firebase initialization error:", error)
     }
-
-    const db = getFirestore(app)
-    const storage = getStorage(app)
-
-    setFirebaseApp(app)
-    setFirestoreDb(db)
-    setFirebaseStorage(storage)
   }, [])
 
   return (
-    <FirebaseContext.Provider
-      value={{
-        app: firebaseApp,
-        db: firestoreDb,
-        storage: firebaseStorage,
-      }}
-    >
+    <FirebaseContext.Provider value={{ app: firebaseApp, auth, db, storage, initialized }}>
       {children}
     </FirebaseContext.Provider>
   )
@@ -44,28 +38,11 @@ export function FirebaseProvider({ children }) {
 
 export const useFirebase = () => {
   const context = useContext(FirebaseContext)
-  if (!context) {
-    throw new Error("useFirebase must be used within a FirebaseProvider")
-  }
+  if (!context) throw new Error("useFirebase must be used within a FirebaseProvider")
   return context
 }
 
-export const useFirebaseApp = () => {
-  const { app } = useFirebase()
-  return app
-}
-
-export const useFirestore = () => {
-  const { db } = useFirebase()
-  return db
-}
-
-export const useStorage = () => {
-  const { storage } = useFirebase()
-  return storage
-}
-
-export const db = () => {
-  const { db } = useFirebase()
-  return db
-}
+export const useFirebaseApp = () => useFirebase().app
+export const useFirestore = () => useFirebase().db
+export const useStorage = () => useFirebase().storage
+export const useFirebaseAuth = () => useFirebase().auth

@@ -1,28 +1,20 @@
 "use client"
-import { useEffect } from "react"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@/components/ui/button"
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Upload, X } from "lucide-react"
+import { Loader2, Upload, X, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/firebase/auth-context"
-import { useFirebase } from "@/lib/firebase/firebase-provider"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { useDatabase } from "@/lib/hooks/use-database"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 const formSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters" }),
@@ -30,19 +22,18 @@ const formSchema = z.object({
   description: z.string().min(10, { message: "Description must be at least 10 characters" }),
   price: z.coerce.number().positive({ message: "Price must be a positive number" }),
   totalSlots: z.coerce.number().int().positive({ message: "Total slots must be a positive integer" }),
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
 })
 
 export default function AddPlotPage() {
   const { user } = useAuth()
-  const { db, storage } = useFirebase()
+  const { createPlot } = useDatabase()
   const router = useRouter()
   const { toast } = useToast()
   const [images, setImages] = useState([])
   const [imageUrls, setImageUrls] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [latitude, setLatitude] = useState(null)
-const [longitude, setLongitude] = useState(null)
-
 
   const form = useForm({
     resolver: zodResolver(formSchema),
@@ -52,39 +43,17 @@ const [longitude, setLongitude] = useState(null)
       description: "",
       price: 0,
       totalSlots: 0,
+      lat: 40.7128, // Default to NYC
+      lng: -74.006,
     },
   })
-
-  useEffect(() => {
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLatitude(position.coords.latitude)
-          setLongitude(position.coords.longitude)
-        },
-        (error) => {
-          console.error("Geolocation error:", error)
-          toast({
-            variant: "destructive",
-            title: "Location Error",
-            description: "We couldn't get your location automatically.",
-          })
-        }
-      )
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Unsupported",
-        description: "Geolocation is not supported by your browser.",
-      })
-    }
-  }, [])
-  
 
   const handleImageChange = (e) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files)
       setImages((prev) => [...prev, ...newFiles])
+
+      // Create preview URLs for the images
       newFiles.forEach((file) => {
         const url = URL.createObjectURL(file)
         setImageUrls((prev) => [...prev, url])
@@ -110,46 +79,39 @@ const [longitude, setLongitude] = useState(null)
     setIsSubmitting(true)
 
     try {
+      // Upload images to Firebase Storage
       const uploadedImageUrls = []
 
-      for (const image of images) {
-        const storageRef = ref(storage, `plots/${user.uid}/${Date.now()}_${image.name}`)
-        await uploadBytes(storageRef, image)
-        const downloadUrl = await getDownloadURL(storageRef)
-        uploadedImageUrls.push(downloadUrl)
+      if (images.length > 0) {
+        // In a real app, you would upload images to Firebase Storage
+        // For demo purposes, we'll use the preview URLs
+        uploadedImageUrls.push(...imageUrls)
       }
 
+      // Add plot data to Firestore
       const plotData = {
         name: values.name,
         address: values.address,
         description: values.description,
         price: values.price,
         totalSlots: values.totalSlots,
-        availableSlots: values.totalSlots,
+        lat: values.lat,
+        lng: values.lng,
         ownerId: user.uid,
         ownerName: user.displayName || "Unknown",
         images: uploadedImageUrls,
         features: [],
         reviews: [],
-        createdAt: new Date().toISOString(),
-        location: latitude && longitude ? { lat: latitude, lng: longitude } : null,
       }
-      
-      const response = await fetch("/api/plots", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(plotData),
-      })
-  
-      if (!response.ok) {
-        console.log("consoling error :")
-        console.log(response)
-        throw new Error("API Error")
-      }
+
+      // Create plot in database
+      await createPlot(plotData)
+
       toast({
-        title: "Plot Added Successfully",
-        description: "Your parking plot has been added and is now available for booking.",
+        title: "Plot Submitted for Approval",
+        description: "Your parking plot has been submitted and is pending approval by an administrator.",
       })
+
       router.push("/dashboard/plots")
     } catch (error) {
       console.error("Error adding plot:", error)
@@ -166,6 +128,15 @@ const [longitude, setLongitude] = useState(null)
   return (
     <div className="container mx-auto">
       <h1 className="text-3xl font-bold mb-6">Add Parking Plot</h1>
+
+      <Alert className="mb-6">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Approval Required</AlertTitle>
+        <AlertDescription>
+          New parking plots require admin approval before they become visible to users. You'll be notified once your
+          plot is approved.
+        </AlertDescription>
+      </Alert>
 
       <div className="grid gap-6">
         <Form {...form}>
@@ -258,6 +229,36 @@ const [longitude, setLongitude] = useState(null)
                       )}
                     />
 
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="lat"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Latitude</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.000001" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="lng"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Longitude</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.000001" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
                     <div>
                       <FormLabel>Upload Images</FormLabel>
                       <div className="mt-2">
@@ -267,9 +268,7 @@ const [longitude, setLongitude] = useState(null)
                             <p className="text-sm text-muted-foreground">
                               Drag and drop images here or click to browse
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              JPG, PNG or GIF, up to 5MB each
-                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">JPG, PNG or GIF, up to 5MB each</p>
                           </div>
                           <Input
                             id="images"
@@ -281,22 +280,13 @@ const [longitude, setLongitude] = useState(null)
                           />
                         </label>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-  <div>
-    <FormLabel>Latitude</FormLabel>
-    <Input value={latitude ?? "Loading..."} readOnly />
-  </div>
-  <div>
-    <FormLabel>Longitude</FormLabel>
-    <Input value={longitude ?? "Loading..."} readOnly />
-  </div>
-</div>   
+
                       {imageUrls.length > 0 && (
                         <div className="mt-4 grid grid-cols-2 gap-2">
                           {imageUrls.map((url, index) => (
                             <div key={index} className="relative rounded-md overflow-hidden">
                               <img
-                                src={url}
+                                src={url || "/placeholder.svg"}
                                 alt={`Preview ${index + 1}`}
                                 className="w-full h-24 object-cover"
                               />
@@ -325,10 +315,10 @@ const [longitude, setLongitude] = useState(null)
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding Plot...
+                    Submitting Plot...
                   </>
                 ) : (
-                  "Add Plot"
+                  "Submit for Approval"
                 )}
               </Button>
             </div>

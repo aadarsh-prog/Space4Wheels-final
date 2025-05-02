@@ -27,7 +27,8 @@ export async function GET(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
-    const userId = params.id
+    const resolvedParams = await params;
+    const userId = resolvedParams.id;
     const userData = await request.json()
 
     const result = await adminDbService.users.updateUser(userId, userData)
@@ -45,7 +46,8 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const userId = params.id
+    const resolvedParams = await params;
+    const userId = resolvedParams.id;
 
     const result = await adminDbService.users.deleteUser(userId)
 

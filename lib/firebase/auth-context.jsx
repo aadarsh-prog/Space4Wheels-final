@@ -1,110 +1,147 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  updateProfile,
-} from "firebase/auth"
-import { doc, setDoc, getDoc } from "firebase/firestore"
+import { createContext, useContext, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useFirebase } from "./firebase-provider"
-import { useToast } from "@/components/ui/use-toast"
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from "firebase/auth"
 
-const AuthContext = createContext(null)
+const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
+  const { auth, initialized } = useFirebase()
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const { app, db } = useFirebase()
-  const { toast } = useToast()
+  const router = useRouter()
 
   useEffect(() => {
-    if (!app) return
+    // Only set up the listener if auth is initialized
+    if (!initialized || !auth) {
+      return
+    }
 
-    const auth = getAuth(app)
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
-        // Get user role from Firestore
+        // Get the ID token
+        const idToken = await firebaseUser.getIdToken()
+
         try {
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid))
-          const userData = userDoc.data()
+          // Verify the session on the server
+          const response = await fetch("/api/auth/session", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ idToken }),
+          })
 
-          const authUser = {
-            ...firebaseUser,
-            role: userData?.role || "user",
+          if (response.ok) {
+            // Get user data including role from the server
+            const userResponse = await fetch(`/api/users/${firebaseUser.uid}`)
+            const userData = await userResponse.json()
+
+            // Set the user with additional data from the server
+            setUser({
+              ...firebaseUser,
+              role: userData.role || "user",
+              profile: userData,
+            })
+          } else {
+            // If session verification fails, sign out
+            await auth.signOut()
+            setUser(null)
           }
-
-          setUser(authUser)
         } catch (error) {
-          console.error("Error fetching user data:", error)
-          setUser(firebaseUser)
+          console.error("Error verifying session:", error)
+          setUser(null)
         }
       } else {
         setUser(null)
       }
-
       setLoading(false)
     })
 
     return () => unsubscribe()
-  }, [app, db])
+  }, [auth, router, initialized])
 
   const signIn = async (email, password) => {
     try {
       setLoading(true)
-      const auth = getAuth(app)
-      await signInWithEmailAndPassword(auth, email, password)
-      toast({
-        title: "Signed in successfully",
-        description: "Welcome back to ParkEase!",
+      if (!auth) throw new Error("Authentication not initialized")
+      
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const idToken = await userCredential.user.getIdToken()
+
+      // Create session cookie on the server
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idToken }),
       })
+
+      if (!response.ok) {
+        throw new Error("Failed to create session")
+      }
+
+      return { success: true }
     } catch (error) {
-      console.error("Sign in error:", error)
-      toast({
-        variant: "destructive",
-        title: "Sign in failed",
-        description: error.message || "Please check your credentials and try again",
-      })
-      throw error
+      console.error("Error signing in:", error)
+      return { success: false, error: error.message }
     } finally {
       setLoading(false)
     }
   }
 
-  const signUp = async (email, password, name, role) => {
+  const signUp = async (email, password, name, role = "user") => {
     try {
       setLoading(true)
-      const auth = getAuth(app)
-      const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password)
+      if (!auth) throw new Error("Authentication not initialized")
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
 
-      // Update profile with display name
-      await updateProfile(firebaseUser, { displayName: name })
+      // Update display name
+      await updateProfile(user, { displayName: name })
 
-      // Store additional user data in Firestore
-      await setDoc(doc(db, "users", firebaseUser.uid), {
-        uid: firebaseUser.uid,
-        email,
-        name,
-        role,
-        createdAt: new Date().toISOString(),
+      // Get the ID token
+      const idToken = await user.getIdToken(true)
+
+      // Create user in the database via API
+      const createUserResponse = await fetch("/api/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          name: name,
+          role: role,
+        }),
       })
 
-      toast({
-        title: "Account created successfully",
-        description: "Welcome to ParkEase!",
+      if (!createUserResponse.ok) {
+        throw new Error("Failed to create user profile")
+      }
+
+      // Create session cookie on the server
+      const sessionResponse = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idToken }),
       })
+
+      if (!sessionResponse.ok) {
+        throw new Error("Failed to create session")
+      }
+
+      return { success: true }
     } catch (error) {
-      console.error("Sign up error:", error)
-      toast({
-        variant: "destructive",
-        title: "Sign up failed",
-        description: error.message || "An error occurred during sign up",
-      })
-      throw error
+      console.error("Error signing up:", error)
+      return { success: false, error: error.message }
     } finally {
       setLoading(false)
     }
@@ -112,55 +149,40 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     try {
-      const auth = getAuth(app)
-      await firebaseSignOut(auth)
-      toast({
-        title: "Signed out successfully",
+      setLoading(true)
+      if (!auth) throw new Error("Authentication not initialized")
+
+      // Clear session on the server
+      await fetch("/api/auth/logout", {
+        method: "POST",
       })
+
+      // Sign out from Firebase
+      await auth.signOut()
+
+      // Redirect to home page
+      router.push("/")
+
+      return { success: true }
     } catch (error) {
-      console.error("Sign out error:", error)
-      toast({
-        variant: "destructive",
-        title: "Sign out failed",
-        description: error.message || "An error occurred during sign out",
-      })
-      throw error
+      console.error("Error signing out:", error)
+      return { success: false, error: error.message }
+    } finally {
+      setLoading(false)
     }
   }
 
-  const getUserRole = async () => {
-    if (!user) return null
-
-    try {
-      const userDoc = await getDoc(doc(db, "users", user.uid))
-      const userData = userDoc.data()
-      return userData?.role || null
-    } catch (error) {
-      console.error("Error fetching user role:", error)
-      return null
-    }
+  const value = {
+    user,
+    loading,
+    signIn,
+    signUp,
+    signOut,
   }
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        signIn,
-        signUp,
-        signOut,
-        getUserRole,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export const useAuth = () => {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
+export function useAuth() {
+  return useContext(AuthContext)
 }

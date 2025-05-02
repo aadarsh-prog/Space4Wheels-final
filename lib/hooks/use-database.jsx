@@ -1,290 +1,417 @@
 "use client"
 
-import { useState, useCallback } from "react"
-import { useFirebase } from "@/lib/firebase/firebase-provider"
+import { useState } from "react"
 import { useAuth } from "@/lib/firebase/auth-context"
-import dbService from "@/lib/firebase/database"
 
 export function useDatabase() {
-  const { db } = useFirebase()
   const { user } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // User functions
-  const getUserProfile = useCallback(async () => {
-    if (!user) return null
-
-    setLoading(true)
-    setError(null)
-
+  // User-related functions
+  const getUserById = async (userId) => {
     try {
-      const result = await dbService.users.getUserById(user.uid)
-      return result.success ? result.data : null
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/users/${userId}`)
+      if (!response.ok) {
+        throw new Error(`Error fetching user: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
     } catch (err) {
       setError(err.message)
+      console.error("Error in getUserById:", err)
       return null
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }
 
-  const updateUserProfile = useCallback(
-    async (userData) => {
-      if (!user) return false
-
+  // Plot-related functions
+  const getPlots = async (filters = {}) => {
+    try {
       setLoading(true)
       setError(null)
 
-      try {
-        const result = await dbService.users.updateUser(user.uid, userData)
-        return result.success
-      } catch (err) {
-        setError(err.message)
-        return false
-      } finally {
-        setLoading(false)
-      }
-    },
-    [user],
-  )
-
-  // Plot functions
-  const createPlot = useCallback(
-    async (plotData) => {
-      if (!user) return null
-
-      setLoading(true)
-      setError(null)
-
-      try {
-        // Add owner information
-        const enhancedPlotData = {
-          ...plotData,
-          ownerId: user.uid,
-          ownerName: user.displayName || user.email,
+      // Build query string from filters
+      const queryParams = new URLSearchParams()
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, value)
         }
+      })
 
-        const result = await dbService.plots.createPlot(enhancedPlotData)
-        return result.success ? result.data : null
-      } catch (err) {
-        setError(err.message)
-        return null
-      } finally {
-        setLoading(false)
+      const response = await fetch(`/api/plots?${queryParams.toString()}`)
+      if (!response.ok) {
+        throw new Error(`Error fetching plots: ${response.statusText}`)
       }
-    },
-    [user],
-  )
-
-  const getPlotById = useCallback(async (plotId) => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const result = await dbService.plots.getPlotById(plotId)
-      return result.success ? result.data : null
+      const data = await response.json()
+      return data
     } catch (err) {
       setError(err.message)
+      console.error("Error in getPlots:", err)
+      return []
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getPlotById = async (plotId) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/plots/${plotId}`)
+      if (!response.ok) {
+        throw new Error(`Error fetching plot: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in getPlotById:", err)
       return null
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
-  const getMyPlots = useCallback(async () => {
-    if (!user) return []
-
-    setLoading(true)
-    setError(null)
-
+  const createPlot = async (plotData) => {
     try {
-      const result = await dbService.plots.getPlotsByOwnerId(user.uid)
-      return result.success ? result.data : []
+      setLoading(true)
+      setError(null)
+      const response = await fetch("/api/plots", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(plotData),
+      })
+      if (!response.ok) {
+        throw new Error(`Error creating plot: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
     } catch (err) {
       setError(err.message)
+      console.error("Error in createPlot:", err)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const updatePlot = async (plotId, plotData) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/plots/${plotId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(plotData),
+      })
+      if (!response.ok) {
+        throw new Error(`Error updating plot: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in updatePlot:", err)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const deletePlot = async (plotId) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/plots/${plotId}`, {
+        method: "DELETE",
+      })
+      if (!response.ok) {
+        throw new Error(`Error deleting plot: ${response.statusText}`)
+      }
+      return true
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in deletePlot:", err)
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getNearbyPlots = async (lat, lng, radius = 5) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/plots/nearby?lat=${lat}&lng=${lng}&radius=${radius}`)
+      if (!response.ok) {
+        throw new Error(`Error fetching nearby plots: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in getNearbyPlots:", err)
       return []
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }
 
-  const getNearbyPlots = useCallback(async (lat, lng, radius = 5) => {
-    setLoading(true)
-    setError(null)
-
+  // Booking-related functions
+  const getBookings = async (filters = {}) => {
     try {
-      const result = await dbService.plots.getNearbyPlots(lat, lng, radius)
-      return result.success ? result.data : []
-    } catch (err) {
-      setError(err.message)
-      return []
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  // Booking functions
-  const createBooking = useCallback(
-    async (bookingData) => {
-      if (!user) return null
-
       setLoading(true)
       setError(null)
 
-      try {
-        // Add user information
-        const enhancedBookingData = {
-          ...bookingData,
-          userId: user.uid,
-          userName: user.displayName || user.email,
+      // Build query string from filters
+      const queryParams = new URLSearchParams()
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, value)
         }
+      })
 
-        const result = await dbService.bookings.createBooking(enhancedBookingData)
-        return result.success ? result.data : null
-      } catch (err) {
-        setError(err.message)
-        return null
-      } finally {
-        setLoading(false)
+      const response = await fetch(`/api/bookings?${queryParams.toString()}`)
+      if (!response.ok) {
+        throw new Error(`Error fetching bookings: ${response.statusText}`)
       }
-    },
-    [user],
-  )
-
-  const getMyBookings = useCallback(async () => {
-    if (!user) return []
-
-    setLoading(true)
-    setError(null)
-
-    try {
-      const result = await dbService.bookings.getBookingsByUserId(user.uid)
-      return result.success ? result.data : []
+      const data = await response.json()
+      return data
     } catch (err) {
       setError(err.message)
+      console.error("Error in getBookings:", err)
       return []
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }
 
-  const getBookingById = useCallback(async (bookingId) => {
-    setLoading(true)
-    setError(null)
-
+  const getBookingById = async (bookingId) => {
     try {
-      const result = await dbService.bookings.getBookingById(bookingId)
-      return result.success ? result.data : null
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/bookings/${bookingId}`)
+      if (!response.ok) {
+        throw new Error(`Error fetching booking: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
     } catch (err) {
       setError(err.message)
+      console.error("Error in getBookingById:", err)
       return null
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
-  const cancelBooking = useCallback(
-    async (bookingId) => {
-      if (!user) return false
-
+  const createBooking = async (bookingData) => {
+    try {
       setLoading(true)
       setError(null)
-
-      try {
-        const result = await dbService.bookings.updateBookingStatus(bookingId, "cancelled")
-        return result.success
-      } catch (err) {
-        setError(err.message)
-        return false
-      } finally {
-        setLoading(false)
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bookingData),
+      })
+      if (!response.ok) {
+        throw new Error(`Error creating booking: ${response.statusText}`)
       }
-    },
-    [user],
-  )
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in createBooking:", err)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  // Review functions
-  const addReview = useCallback(
-    async (plotId, rating, comment) => {
-      if (!user) return null
-
+  const updateBookingStatus = async (bookingId, status) => {
+    try {
       setLoading(true)
       setError(null)
+      const response = await fetch(`/api/bookings/${bookingId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      })
+      if (!response.ok) {
+        throw new Error(`Error updating booking status: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in updateBookingStatus:", err)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
 
-      try {
-        const reviewData = {
-          userId: user.uid,
-          userName: user.displayName || user.email,
+  const cancelBooking = async (bookingId) => {
+    return updateBookingStatus(bookingId, "cancelled")
+  }
+
+  // Review-related functions
+  const addReview = async (plotId, rating, comment) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch("/api/reviews", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           plotId,
+          userId: user.uid,
+          userName: user.displayName || "Anonymous",
           rating,
           comment,
-        }
-
-        const result = await dbService.reviews.createReview(reviewData)
-        return result.success ? result.data : null
-      } catch (err) {
-        setError(err.message)
-        return null
-      } finally {
-        setLoading(false)
+        }),
+      })
+      if (!response.ok) {
+        throw new Error(`Error adding review: ${response.statusText}`)
       }
-    },
-    [user],
-  )
-
-  const getPlotReviews = useCallback(async (plotId) => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const result = await dbService.reviews.getReviewsByPlotId(plotId)
-      return result.success ? result.data : []
+      const data = await response.json()
+      return data
     } catch (err) {
       setError(err.message)
-      return []
+      console.error("Error in addReview:", err)
+      return null
     } finally {
       setLoading(false)
     }
-  }, [])
+  }
 
-  // Notification functions
-  const getMyNotifications = useCallback(async () => {
-    if (!user) return []
-
-    setLoading(true)
-    setError(null)
-
+  const getReviewsByPlotId = async (plotId) => {
     try {
-      const result = await dbService.notifications.getNotificationsByUserId(user.uid)
-      return result.success ? result.data : []
-    } catch (err) {
-      setError(err.message)
-      return []
-    } finally {
-      setLoading(false)
-    }
-  }, [user])
-
-  const markNotificationRead = useCallback(
-    async (notificationId) => {
-      if (!user) return false
-
       setLoading(true)
       setError(null)
-
-      try {
-        const result = await dbService.notifications.markNotificationAsRead(notificationId)
-        return result.success
-      } catch (err) {
-        setError(err.message)
-        return false
-      } finally {
-        setLoading(false)
+      const response = await fetch(`/api/reviews?plotId=${plotId}`)
+      if (!response.ok) {
+        throw new Error(`Error fetching reviews: ${response.statusText}`)
       }
-    },
-    [user],
-  )
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in getReviewsByPlotId:", err)
+      return []
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Admin-specific functions
+  const getAdminStats = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch("/api/admin/stats")
+      if (!response.ok) {
+        throw new Error(`Error fetching admin stats: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in getAdminStats:", err)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const approvePlot = async (plotId) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/admin/plots/${plotId}/approve`, {
+        method: "PUT",
+      })
+      if (!response.ok) {
+        throw new Error(`Error approving plot: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in approvePlot:", err)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const rejectPlot = async (plotId, reason) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/admin/plots/${plotId}/reject`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reason }),
+      })
+      if (!response.ok) {
+        throw new Error(`Error rejecting plot: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in rejectPlot:", err)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Payment-related functions
+  const processPayment = async (bookingId, paymentDetails) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/payments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bookingId,
+          ...paymentDetails,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error(`Error processing payment: ${response.statusText}`)
+      }
+      const data = await response.json()
+      return data
+    } catch (err) {
+      setError(err.message)
+      console.error("Error in processPayment:", err)
+      return null
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return {
     // State
@@ -292,27 +419,33 @@ export function useDatabase() {
     error,
 
     // User functions
-    getUserProfile,
-    updateUserProfile,
+    getUserById,
 
     // Plot functions
-    createPlot,
+    getPlots,
     getPlotById,
-    getMyPlots,
+    createPlot,
+    updatePlot,
+    deletePlot,
     getNearbyPlots,
 
     // Booking functions
-    createBooking,
-    getMyBookings,
+    getBookings,
     getBookingById,
+    createBooking,
+    updateBookingStatus,
     cancelBooking,
 
     // Review functions
     addReview,
-    getPlotReviews,
+    getReviewsByPlotId,
 
-    // Notification functions
-    getMyNotifications,
-    markNotificationRead,
+    // Admin functions
+    getAdminStats,
+    approvePlot,
+    rejectPlot,
+
+    // Payment functions
+    processPayment,
   }
 }

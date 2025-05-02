@@ -1,3 +1,4 @@
+// File: app/api/auth/login/route.js
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import adminDbService from "@/lib/firebase/admin-database"
@@ -28,8 +29,8 @@ export async function POST(request) {
       return NextResponse.json({ error: "Failed to create session" }, { status: 500 })
     }
 
-    // Set the session cookie
-    const { sessionCookie } = cookieResult.data
+    // Set the session cookie - fixing the sync cookies issue
+    const sessionCookie = cookieResult.data.sessionCookie
     const cookieOptions = {
       maxAge: 60 * 60 * 24 * 5, // 5 days
       httpOnly: true,
@@ -38,7 +39,9 @@ export async function POST(request) {
       sameSite: "strict",
     }
 
-    cookies().set("session", sessionCookie, cookieOptions)
+    // FIX: Await the cookies() call before setting the cookie
+    const cookieStore = await cookies()
+    cookieStore.set("session", sessionCookie, cookieOptions)
 
     return NextResponse.json({ success: true })
   } catch (error) {
