@@ -1,26 +1,38 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { createContext, useContext, useEffect, useState } from "react"
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  updateProfile,
+} from "firebase/auth"
 import { useFirebase } from "./firebase-provider"
+import { useToast } from "@/components/ui/use-toast"
 
-const AuthContext = createContext()
+const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const { auth } = useFirebase()
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const router = useRouter()
+  const { app } = useFirebase()
+  const { toast } = useToast()
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      if (firebaseUser) {
-        // Get the ID token
-        const idToken = await firebaseUser.getIdToken()
+    if (!app) return
 
+    const auth = getAuth(app)
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
         try {
-          // Verify the session on the server
-          const response = await fetch("/api/auth/session", {
+          // Get the ID token
+          const idToken = await firebaseUser.getIdToken()
+
+          // Send the ID token to the server to create a session
+          const response = await fetch("/api/auth/login", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -28,110 +40,100 @@ export function AuthProvider({ children }) {
             body: JSON.stringify({ idToken }),
           })
 
-          if (response.ok) {
-            // Get user data including role from the server
-            const userResponse = await fetch(`/api/users/${firebaseUser.uid}`)
+          if (!response.ok) {
+            console.error("Failed to create session")
+          }
+
+          // Get user data from the server
+          const userResponse = await fetch(`/api/users/${firebaseUser.uid}`)
+          if (userResponse.ok) {
             const userData = await userResponse.json()
 
-            // Set the user with additional data from the server
-            setUser({
+            const authUser = {
               ...firebaseUser,
-              role: userData.role || "user",
-              profile: userData,
-            })
+              role: userData?.role || "user",
+            }
+
+            setUser(authUser)
           } else {
-            // If session verification fails, sign out
-            await auth.signOut()
-            setUser(null)
+            setUser(firebaseUser)
           }
         } catch (error) {
-          console.error("Error verifying session:", error)
-          setUser(null)
+          console.error("Error setting up user session:", error)
+          setUser(firebaseUser)
         }
       } else {
         setUser(null)
       }
+
       setLoading(false)
     })
 
     return () => unsubscribe()
-  }, [auth, router])
+  }, [app])
 
   const signIn = async (email, password) => {
     try {
       setLoading(true)
-      const userCredential = await auth.signInWithEmailAndPassword(email, password)
-      const idToken = await userCredential.user.getIdToken()
+      const auth = getAuth(app)
+      await signInWithEmailAndPassword(auth, email, password)
 
-      // Create session cookie on the server
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ idToken }),
+      toast({
+        title: "Signed in successfully",
+        description: "Welcome back to ParkEase!",
       })
-
-      if (!response.ok) {
-        throw new Error("Failed to create session")
-      }
-
-      return { success: true }
     } catch (error) {
-      console.error("Error signing in:", error)
-      return { success: false, error: error.message }
+      console.error("Sign in error:", error)
+      toast({
+        variant: "destructive",
+        title: "Sign in failed",
+        description: error.message || "Please check your credentials and try again",
+      })
+      throw error
     } finally {
       setLoading(false)
     }
   }
 
-  const signUp = async (email, password, name, role = "user") => {
+  const signUp = async (email, password, name, role) => {
     try {
       setLoading(true)
-      const userCredential = await auth.createUserWithEmailAndPassword(email, password)
-      const user = userCredential.user
+      const auth = getAuth(app)
+      const { user: firebaseUser } = await createUserWithEmailAndPassword(auth, email, password)
 
-      // Update display name
-      await user.updateProfile({ displayName: name })
-
-      // Get the ID token
-      const idToken = await user.getIdToken(true)
+      // Update profile with display name
+      await updateProfile(firebaseUser, { displayName: name })
 
       // Create user in the database via API
-      const createUserResponse = await fetch("/api/users", {
+      const response = await fetch("/api/users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          name: name,
-          role: role,
+          uid: firebaseUser.uid,
+          email,
+          name,
+          role,
         }),
       })
 
-      if (!createUserResponse.ok) {
+      if (!response.ok) {
         throw new Error("Failed to create user profile")
       }
 
-      // Create session cookie on the server
-      const sessionResponse = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ idToken }),
+      toast({
+        title: "Account created successfully",
+        description: "Welcome to ParkEase!",
       })
-
-      if (!sessionResponse.ok) {
-        throw new Error("Failed to create session")
-      }
-
-      return { success: true }
     } catch (error) {
-      console.error("Error signing up:", error)
-      return { success: false, error: error.message }
+      console.error("Sign up error:", error)
+      toast({
+        variant: "destructive",
+        title: "Sign up failed",
+        description: error.message || "An error occurred during sign up",
+      })
+      throw error
     } finally {
       setLoading(false)
     }
@@ -139,39 +141,47 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     try {
-      setLoading(true)
+      const auth = getAuth(app)
+      await firebaseSignOut(auth)
 
-      // Clear session on the server
+      // Clear the session cookie
       await fetch("/api/auth/logout", {
         method: "POST",
       })
 
-      // Sign out from Firebase
-      await auth.signOut()
-
-      // Redirect to home page
-      router.push("/")
-
-      return { success: true }
+      toast({
+        title: "Signed out successfully",
+      })
     } catch (error) {
-      console.error("Error signing out:", error)
-      return { success: false, error: error.message }
-    } finally {
-      setLoading(false)
+      console.error("Sign out error:", error)
+      toast({
+        variant: "destructive",
+        title: "Sign out failed",
+        description: error.message || "An error occurred during sign out",
+      })
+      throw error
     }
   }
 
-  const value = {
-    user,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
-export function useAuth() {
-  return useContext(AuthContext)
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
 }
