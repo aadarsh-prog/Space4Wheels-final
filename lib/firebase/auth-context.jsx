@@ -3,22 +3,16 @@
 import { createContext, useContext, useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useFirebase } from "./firebase-provider"
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from "firebase/auth"
 
 const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
-  const { auth, initialized } = useFirebase()
+  const { auth } = useFirebase()
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    // Only set up the listener if auth is initialized
-    if (!initialized || !auth) {
-      return
-    }
-
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
         // Get the ID token
@@ -61,14 +55,12 @@ export function AuthProvider({ children }) {
     })
 
     return () => unsubscribe()
-  }, [auth, router, initialized])
+  }, [auth, router])
 
   const signIn = async (email, password) => {
     try {
       setLoading(true)
-      if (!auth) throw new Error("Authentication not initialized")
-      
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const userCredential = await auth.signInWithEmailAndPassword(email, password)
       const idToken = await userCredential.user.getIdToken()
 
       // Create session cookie on the server
@@ -96,13 +88,11 @@ export function AuthProvider({ children }) {
   const signUp = async (email, password, name, role = "user") => {
     try {
       setLoading(true)
-      if (!auth) throw new Error("Authentication not initialized")
-      
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password)
       const user = userCredential.user
 
       // Update display name
-      await updateProfile(user, { displayName: name })
+      await user.updateProfile({ displayName: name })
 
       // Get the ID token
       const idToken = await user.getIdToken(true)
@@ -150,7 +140,6 @@ export function AuthProvider({ children }) {
   const signOut = async () => {
     try {
       setLoading(true)
-      if (!auth) throw new Error("Authentication not initialized")
 
       // Clear session on the server
       await fetch("/api/auth/logout", {

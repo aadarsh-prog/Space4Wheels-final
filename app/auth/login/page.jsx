@@ -34,6 +34,7 @@ export default function LoginPage() {
   async function onSubmit(values) {
     try {
       setIsLoading(true)
+      
       await signIn(values.email, values.password)
       router.push("/dashboard")
     } catch (error) {
