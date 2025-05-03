@@ -36,6 +36,7 @@ export async function POST(request) {
     initAdmin()
 
     const data = await request.json()
+    console.log("Received plot data:", data)
 
     // Validate required fields
     if (!data.name || !data.address || !data.price || !data.totalSlots || !data.ownerId) {
@@ -43,6 +44,7 @@ export async function POST(request) {
     }
 
     const result = await adminDbService.plots.createPlot(data)
+    console.log("Create plot result:", result)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 })

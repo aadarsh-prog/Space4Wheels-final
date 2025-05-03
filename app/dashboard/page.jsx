@@ -18,24 +18,14 @@ export default function UserDashboard() {
   const [recentBookings, setRecentBookings] = useState([])
   const [userLocation, setUserLocation] = useState({ lat: 40.7128, lng: -74.006 }) // Default to NYC
   useEffect(() => {
+      // Redirect if not a regular user
     if (user) {
       if (user.role !== "user") {
-        router.push(user.role === "admin" ? "/admin" : "/owner-dashboard")
+        router.push(user.role === "admin" ? "/admin" : "/dashboard/owner-dashboard")
       }
     }
   }, [user, router])
   useEffect(() => {
-    // Redirect if not a regular user
-    console.log(user.role);
-    if (user && user.role !== "user") {
-      if (user.role === "owner") {
-        router.push("/dashboard/owner-dashboard")
-      } else if (user.role === "admin") {
-        router.push("/admin")
-      }
-      return
-    }
-
     // Get user's location if available
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(

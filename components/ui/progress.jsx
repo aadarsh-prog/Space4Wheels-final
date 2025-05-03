@@ -21,6 +21,6 @@ const Progress = forwardRef(({ className, value, ...props }, ref) => (
   </ProgressPrimitive.Root>
 ))
 
-Progress.displayName = "Progress"
+Progress.displayName = ProgressPrimitive.Root.displayName
 
 export { Progress }

@@ -19,44 +19,13 @@ export default function MyPlotsPage() {
     const fetchPlots = async () => {
       if (!user || !db) return
 
-      try {
-        // For demo purposes, we'll use dummy data
-        // In a real app, you would fetch from Firestore
-        // const plotsRef = collection(db, "plots")
-        // const q = query(plotsRef, where("ownerId", "==", user.uid))
-        // const querySnapshot = await getDocs(q)
-        // const plotsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        // setPlots(plotsData)
-
-        // Dummy data
-        const dummyPlots = [
-          {
-            id: "plot1",
-            name: "My Downtown Lot",
-            address: "123 Owner St, Downtown",
-            price: 5,
-            availableSlots: 8,
-            totalSlots: 15,
-            totalBookings: 45,
-            lat: 40.7128,
-            lng: -74.006,
-            createdAt: "2023-01-01T00:00:00.000Z",
-          },
-          {
-            id: "plot2",
-            name: "My Suburban Lot", 
-            address: "456 Owner Ave, Suburbs",
-            price: 4,
-            availableSlots: 20,
-            totalSlots: 25,
-            totalBookings: 32,
-            lat: 40.7138,
-            lng: -74.013,
-            createdAt: "2023-01-15T00:00:00.000Z",
-          },
-        ]
-
-        setPlots(dummyPlots)
+      
+        try {
+          const plotsResponse = await fetch(`/api/plots?ownerId=${user.uid}`)
+          if (!plotsResponse.ok) throw new Error("Failed to fetch plots")
+    
+          const plotsData = await plotsResponse.json()
+          setPlots(plotsData)
       } catch (error) {
         console.error("Error fetching plots:", error)
       } finally {
