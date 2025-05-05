@@ -18,14 +18,7 @@ export default function AdminDashboard() {
   const [pendingPlots, setPendingPlots] = useState([])
   const [recentUsers, setRecentUsers] = useState([])
   const [recentBookings, setRecentBookings] = useState([])
-  useEffect(() => {
-    // Redirect if not an admin
-    if (user) {
-      if (user.role !== "admin") {
-        router.push(user.role === "owner" ? "/dashboard/owner-dashboard" : "/dashboard")
-      }
-    }
-  }, [user, router])
+ 
   useEffect(() => {
     
     const fetchAdminData = async () => {

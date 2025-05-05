@@ -15,6 +15,7 @@ import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api"
 import { useAuth } from "@/lib/firebase/auth-context"
 import { useDatabase } from "@/lib/hooks/use-database"
 import { PaymentForm } from "@/components/payment/payment-form"
+import { motion, AnimatePresence } from "framer-motion"
 
 const mapContainerStyle = {
   width: "100%",
@@ -38,6 +39,7 @@ export default function PlotDetailPage() {
   const [isBooking, setIsBooking] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
   const [bookingDetails, setBookingDetails] = useState(null)
+  const [bookingStep, setBookingStep] = useState("details") // details, payment, confirmation
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -140,7 +142,7 @@ export default function PlotDetailPage() {
     }
 
     setBookingDetails(bookingData)
-    setShowPayment(true)
+    setBookingStep("payment")
   }
 
   const handlePaymentComplete = async (paymentDetails) => {
@@ -164,13 +166,17 @@ export default function PlotDetailPage() {
         throw new Error("Failed to process payment")
       }
 
+      setBookingStep("confirmation")
+
       toast({
         title: "Booking Confirmed!",
         description: `You have successfully booked a parking spot at ${plot.name}.`,
       })
 
-      // Redirect to bookings page
-      router.push("/dashboard/bookings")
+      // Wait a moment before redirecting
+      setTimeout(() => {
+        router.push("/dashboard/bookings")
+      }, 3000)
     } catch (error) {
       console.error("Error completing booking:", error)
       toast({
@@ -178,14 +184,14 @@ export default function PlotDetailPage() {
         title: "Booking Failed",
         description: "There was an error processing your booking. Please try again.",
       })
+      setBookingStep("details")
     } finally {
       setIsBooking(false)
-      setShowPayment(false)
     }
   }
 
   const handleCancelPayment = () => {
-    setShowPayment(false)
+    setBookingStep("details")
     setBookingDetails(null)
   }
 
@@ -381,88 +387,152 @@ export default function PlotDetailPage() {
           </div>
 
           <div className="space-y-6">
-            {showPayment ? (
-              <PaymentForm
-                amount={calculatePrice()}
-                onPaymentComplete={handlePaymentComplete}
-                onCancel={handleCancelPayment}
-              />
-            ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <h3 className="text-lg font-semibold mb-4">Book a Parking Spot</h3>
+            <AnimatePresence mode="wait">
+              {bookingStep === "details" && (
+                <motion.div
+                  key="booking-details"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="text-lg font-semibold mb-4">Book a Parking Spot</h3>
 
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm font-medium mb-2">Select Date</p>
-                      <Calendar
-                        mode="single"
-                        selected={date}
-                        onSelect={setDate}
-                        className="border rounded-md"
-                        disabled={(date) => date < new Date()}
-                      />
-                    </div>
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm font-medium mb-2">Select Date</p>
+                          <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={setDate}
+                            className="border rounded-md"
+                            disabled={(date) => date < new Date()}
+                          />
+                        </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm font-medium mb-2">Start Time</p>
-                        <Select value={startTime} onValueChange={setStartTime}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select start time" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {timeSlots.map((time) => (
-                              <SelectItem key={time} value={time}>
-                                {time}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium mb-2">Start Time</p>
+                            <Select value={startTime} onValueChange={setStartTime}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select start time" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {timeSlots.map((time) => (
+                                  <SelectItem key={time} value={time}>
+                                    {time}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div>
+                            <p className="text-sm font-medium mb-2">End Time</p>
+                            <Select value={endTime} onValueChange={setEndTime}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select end time" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {timeSlots.map((time) => (
+                                  <SelectItem key={time} value={time}>
+                                    {time}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="border-t pt-4 mt-4">
+                          <div className="flex justify-between mb-2">
+                            <span>Parking Fee</span>
+                            <span>
+                              ${displayPlot.price} x {calculateDuration()} hours
+                            </span>
+                          </div>
+                          <div className="flex justify-between font-bold text-lg">
+                            <span>Total</span>
+                            <span>${calculatePrice()}</span>
+                          </div>
+                        </div>
+
+                        <Button className="w-full" onClick={handleBookNow} disabled={isBooking || !date}>
+                          {isBooking ? "Processing..." : "Book Now"}
+                        </Button>
+
+                        <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <p>You won't be charged until you confirm your booking.</p>
+                        </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
 
-                      <div>
-                        <p className="text-sm font-medium mb-2">End Time</p>
-                        <Select value={endTime} onValueChange={setEndTime}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select end time" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {timeSlots.map((time) => (
-                              <SelectItem key={time} value={time}>
-                                {time}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+              {bookingStep === "payment" && (
+                <motion.div
+                  key="payment-form"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <PaymentForm
+                    amount={calculatePrice()}
+                    onPaymentComplete={handlePaymentComplete}
+                    onCancel={handleCancelPayment}
+                    bookingDetails={bookingDetails}
+                  />
+                </motion.div>
+              )}
+
+              {bookingStep === "confirmation" && (
+                <motion.div
+                  key="booking-confirmation"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Card>
+                    <CardContent className="pt-6 text-center">
+                      <div className="flex flex-col items-center justify-center py-6">
+                        <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                          <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">Booking Confirmed!</h3>
+                        <p className="text-muted-foreground mb-4">Your parking spot has been successfully booked.</p>
+                        <div className="bg-muted p-4 rounded-md text-left w-full mb-4">
+                          <h4 className="font-medium mb-2">Booking Details</h4>
+                          <div className="space-y-1 text-sm">
+                            <p>
+                              <span className="text-muted-foreground">Location:</span> {bookingDetails?.plotName}
+                            </p>
+                            <p>
+                              <span className="text-muted-foreground">Date:</span> {bookingDetails?.date}
+                            </p>
+                            <p>
+                              <span className="text-muted-foreground">Time:</span> {bookingDetails?.startTime} -{" "}
+                              {bookingDetails?.endTime}
+                            </p>
+                            <p>
+                              <span className="text-muted-foreground">Total:</span> ${calculatePrice()}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground">Redirecting to your bookings...</p>
                       </div>
-                    </div>
-
-                    <div className="border-t pt-4 mt-4">
-                      <div className="flex justify-between mb-2">
-                        <span>Parking Fee</span>
-                        <span>
-                          ${displayPlot.price} x {calculateDuration()} hours
-                        </span>
-                      </div>
-                      <div className="flex justify-between font-bold text-lg">
-                        <span>Total</span>
-                        <span>${calculatePrice()}</span>
-                      </div>
-                    </div>
-
-                    <Button className="w-full" onClick={handleBookNow} disabled={isBooking || !date}>
-                      {isBooking ? "Processing..." : "Book Now"}
-                    </Button>
-
-                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <p>You won't be charged until you confirm your booking.</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <Card>
               <CardContent className="pt-6">

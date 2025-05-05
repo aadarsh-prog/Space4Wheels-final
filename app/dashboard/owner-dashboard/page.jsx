@@ -21,17 +21,17 @@ export default function OwnerDashboard() {
     totalBookings: 0,
     totalRevenue: 0,
   })
+
   useEffect(() => {
     // Redirect if not an owner
-    if (user) {
-      if (user.role !== "owner") {
-        router.push(user.role === "admin" ? "/admin" : "/dashboard")
+    if (user && user.role !== "owner") {
+      if (user.role === "admin") {
+        router.push("/admin")
+      } else {
+        router.push("/dashboard")
       }
+      return
     }
-  }, [user, router])
-  useEffect(() => {
-    
-   
 
     const fetchOwnerData = async () => {
       try {
@@ -117,7 +117,7 @@ export default function OwnerDashboard() {
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Owner Dashboard</h1>
-        <Link href="/dashboard/plots/add">
+        <Link href="/owner/plots/add">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Add New Plot
@@ -173,7 +173,7 @@ export default function OwnerDashboard() {
             <Card>
               <CardContent className="pt-6 text-center">
                 <p className="mb-4">You haven't added any parking plots yet.</p>
-                <Link href="/dashboard/plots/add">
+                <Link href="/owner/plots/add">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Your First Plot

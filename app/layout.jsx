@@ -8,7 +8,7 @@ import { AuthProvider } from "@/lib/firebase/auth-context"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "ParkEase - Find and Book Parking Spots",
+  title: "Space4Wheels - Find and Book Parking Spots",
   description: "Find and book parking spots near you with ease",
   generator: "v0.dev",
 }

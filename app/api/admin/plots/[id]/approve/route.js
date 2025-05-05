@@ -7,14 +7,15 @@ initAdmin()
 
 export async function PUT(request, { params }) {
   try {
-    const plotId = params.id
+    const resolvedParams = await params;
+    const plotId = resolvedParams.id;
 
     if (!plotId) {
       return NextResponse.json({ error: "Plot ID is required" }, { status: 400 })
     }
 
     // Approve the plot
-    const result = await adminDbService.plots.updatePlotStatus(plotId, "approved")
+    const result = await adminDbService.plots.approvePlot(plotId)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 })

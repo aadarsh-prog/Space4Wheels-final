@@ -22,7 +22,8 @@ export async function POST(request) {
     }
 
     // Get the existing session cookie
-    const sessionCookie = cookies().get("session")?.value
+    const cookiesStore = await cookies()
+    const sessionCookie = cookiesStore.get("session")?.value
 
     // If no session cookie exists, create a new one
     if (!sessionCookie) {
@@ -43,7 +44,7 @@ export async function POST(request) {
         sameSite: "strict",
       }
 
-      cookies().set("session", sessionCookie, cookieOptions)
+      await cookiesStore.set("session", sessionCookie, cookieOptions)
     }
 
     // Get user data including role
