@@ -117,7 +117,7 @@ export default function OwnerDashboard() {
     <div className="container mx-auto">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Owner Dashboard</h1>
-        <Link href="/owner/plots/add">
+        <Link href="/dashboard/plots/add">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Add New Plot
@@ -173,7 +173,7 @@ export default function OwnerDashboard() {
             <Card>
               <CardContent className="pt-6 text-center">
                 <p className="mb-4">You haven't added any parking plots yet.</p>
-                <Link href="/owner/plots/add">
+                <Link href="/dashboard/plots/add">
                   <Button>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Your First Plot

@@ -1,312 +1,202 @@
 "use client"
 
 import { useState } from "react"
-import { z } from "zod"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@/components/ui/button"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Loader2, CreditCard, Wallet } from "lucide-react"
-import { motion } from "framer-motion"
+import { Label } from "@/components/ui/label"
+import { Loader2, CreditCard, Calendar, Lock } from "lucide-react"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 
-const paymentFormSchema = z
-  .object({
-    paymentMethod: z.enum(["credit_card", "paypal"], {
-      required_error: "Please select a payment method",
-    }),
-    cardNumber: z
-      .string()
-      .optional()
-      .refine((val) => !val || /^\d{16}$/.test(val), { message: "Card number must be 16 digits" }),
-    cardName: z.string().optional(),
-    expiryDate: z
-      .string()
-      .optional()
-      .refine((val) => !val || /^(0[1-9]|1[0-2])\/\d{2}$/.test(val), {
-        message: "Expiry date must be in MM/YY format",
-      }),
-    cvv: z
-      .string()
-      .optional()
-      .refine((val) => !val || /^\d{3,4}$/.test(val), { message: "CVV must be 3 or 4 digits" }),
-  })
-  .refine(
-    (data) => {
-      if (data.paymentMethod === "credit_card") {
-        return !!data.cardNumber && !!data.cardName && !!data.expiryDate && !!data.cvv
-      }
-      return true
-    },
-    {
-      message: "Please fill in all credit card details",
-      path: ["paymentMethod"],
-    },
-  )
+export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) {
+  const [cardNumber, setCardNumber] = useState("")
+  const [cardName, setCardName] = useState("")
+  const [expiryDate, setExpiryDate] = useState("")
+  const [cvv, setCvv] = useState("")
+  const [errors, setErrors] = useState({})
 
-export function PaymentForm({ amount, onPaymentComplete, onCancel, bookingDetails }) {
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [paymentStep, setPaymentStep] = useState("details") // details, processing, success
+  // Format card number with spaces
+  const formatCardNumber = (value) => {
+    const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "")
+    const matches = v.match(/\d{4,16}/g)
+    const match = (matches && matches[0]) || ""
+    const parts = []
 
-  const form = useForm({
-    resolver: zodResolver(paymentFormSchema),
-    defaultValues: {
-      paymentMethod: "credit_card",
-      cardNumber: "",
-      cardName: "",
-      expiryDate: "",
-      cvv: "",
-    },
-  })
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4))
+    }
 
-  const watchPaymentMethod = form.watch("paymentMethod")
+    if (parts.length) {
+      return parts.join(" ")
+    } else {
+      return value
+    }
+  }
 
-  const onSubmit = async (values) => {
-    setIsProcessing(true)
-    setPaymentStep("processing")
+  // Format expiry date
+  const formatExpiryDate = (value) => {
+    const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "")
 
-    try {
-      // In a real app, you would process the payment with a payment gateway
-      // For demo purposes, we'll simulate a successful payment after a delay
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+    if (v.length >= 2) {
+      return `${v.substring(0, 2)}/${v.substring(2, 4)}`
+    }
 
-      setPaymentStep("success")
+    return v
+  }
 
-      // Wait a moment to show success state before completing
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {}
 
-      // Call the callback with payment details
-      onPaymentComplete({
-        method: values.paymentMethod,
-        status: "completed",
-        transactionId: `tx_${Date.now()}`,
-        amount,
+    if (!cardNumber.trim()) {
+      newErrors.cardNumber = "Card number is required"
+    } else if (cardNumber.replace(/\s+/g, "").length !== 16) {
+      newErrors.cardNumber = "Card number must be 16 digits"
+    }
+
+    if (!cardName.trim()) {
+      newErrors.cardName = "Cardholder name is required"
+    }
+
+    if (!expiryDate.trim()) {
+      newErrors.expiryDate = "Expiry date is required"
+    } else if (!/^\d{2}\/\d{2}$/.test(expiryDate)) {
+      newErrors.expiryDate = "Expiry date must be in MM/YY format"
+    }
+
+    if (!cvv.trim()) {
+      newErrors.cvv = "CVV is required"
+    } else if (!/^\d{3,4}$/.test(cvv)) {
+      newErrors.cvv = "CVV must be 3 or 4 digits"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  // Handle form submission
+  const handleSubmit = (e) => {
+    e.preventDefault()
+
+    if (validateForm()) {
+      onSubmit({
+        cardNumber: cardNumber.replace(/\s+/g, ""),
+        cardName,
+        expiryDate,
+        cvv,
       })
-    } catch (error) {
-      console.error("Payment error:", error)
-      form.setError("root", {
-        type: "manual",
-        message: "Payment failed. Please try again.",
-      })
-      setPaymentStep("details")
-    } finally {
-      setIsProcessing(false)
     }
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Payment Details</CardTitle>
-        <CardDescription>Complete your payment to confirm booking</CardDescription>
-      </CardHeader>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="cardNumber">Card Number</Label>
+        <div className="relative">
+          <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            id="cardNumber"
+            placeholder="1234 5678 9012 3456"
+            value={cardNumber}
+            onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+            className="pl-10"
+            maxLength={19}
+          />
+        </div>
+        {errors.cardNumber && <p className="text-sm text-red-500">{errors.cardNumber}</p>}
+      </div>
 
-      {paymentStep === "details" && (
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <CardContent className="space-y-4">
-              {/* Booking Summary */}
-              <div className="bg-muted p-4 rounded-md mb-4">
-                <h3 className="font-medium mb-2">Booking Summary</h3>
-                <div className="text-sm space-y-1">
-                  <p>
-                    <span className="text-muted-foreground">Location:</span> {bookingDetails?.plotName}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Date:</span> {bookingDetails?.date}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Time:</span> {bookingDetails?.startTime} -{" "}
-                    {bookingDetails?.endTime}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Duration:</span> {bookingDetails?.duration} hours
-                  </p>
-                </div>
-              </div>
+      <div className="space-y-2">
+        <Label htmlFor="cardName">Cardholder Name</Label>
+        <Input id="cardName" placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
+        {errors.cardName && <p className="text-sm text-red-500">{errors.cardName}</p>}
+      </div>
 
-              <div className="text-2xl font-bold text-center mb-4">Total: ${amount}</div>
-
-              <FormField
-                control={form.control}
-                name="paymentMethod"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>Payment Method</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-col space-y-1"
-                      >
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="credit_card" />
-                          </FormControl>
-                          <FormLabel className="font-normal cursor-pointer flex items-center">
-                            <CreditCard className="mr-2 h-4 w-4" />
-                            Credit Card
-                          </FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="paypal" />
-                          </FormControl>
-                          <FormLabel className="font-normal cursor-pointer flex items-center">
-                            <Wallet className="mr-2 h-4 w-4" />
-                            PayPal
-                          </FormLabel>
-                        </FormItem>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {watchPaymentMethod === "credit_card" && (
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="cardNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Card Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="1234 5678 9012 3456" {...field} />
-                        </FormControl>
-                        <FormDescription>Enter the 16-digit number on your card</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="cardName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name on Card</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="expiryDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Expiry Date</FormLabel>
-                          <FormControl>
-                            <Input placeholder="MM/YY" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="cvv"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>CVV</FormLabel>
-                          <FormControl>
-                            <Input placeholder="123" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {watchPaymentMethod === "paypal" && (
-                <div className="bg-muted p-4 rounded-md text-center">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    You will be redirected to PayPal to complete your payment.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Note: This is a demo. No actual redirection will occur.
-                  </p>
-                </div>
-              )}
-
-              {form.formState.errors.root && (
-                <div className="text-red-500 text-sm text-center">{form.formState.errors.root.message}</div>
-              )}
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <Button type="button" variant="outline" onClick={onCancel} disabled={isProcessing}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isProcessing}>
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  `Pay $${amount}`
-                )}
-              </Button>
-            </CardFooter>
-          </form>
-        </Form>
-      )}
-
-      {paymentStep === "processing" && (
-        <CardContent className="py-10">
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="relative">
-              <Loader2 className="h-16 w-16 animate-spin text-primary" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-8 w-8 rounded-full bg-background"></div>
-              </div>
-            </div>
-            <div className="text-center">
-              <h3 className="text-lg font-medium">Processing Payment</h3>
-              <p className="text-sm text-muted-foreground mt-1">Please wait while we process your payment...</p>
-            </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="expiryDate">Expiry Date</Label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="expiryDate"
+              placeholder="MM/YY"
+              value={expiryDate}
+              onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
+              className="pl-10"
+              maxLength={5}
+            />
           </div>
-        </CardContent>
-      )}
+          {errors.expiryDate && <p className="text-sm text-red-500">{errors.expiryDate}</p>}
+        </div>
 
-      {paymentStep === "success" && (
-        <CardContent className="py-10">
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center"
-            >
-              <motion.svg
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="h-8 w-8 text-green-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </motion.svg>
-            </motion.div>
-            <div className="text-center">
-              <h3 className="text-lg font-medium">Payment Successful!</h3>
-              <p className="text-sm text-muted-foreground mt-1">Your booking has been confirmed.</p>
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="cvv">CVV</Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="cvv"
+              placeholder="123"
+              value={cvv}
+              onChange={(e) => setCvv(e.target.value.replace(/[^0-9]/g, ""))}
+              className="pl-10"
+              maxLength={4}
+              type="password"
+            />
           </div>
-        </CardContent>
-      )}
-    </Card>
+          {errors.cvv && <p className="text-sm text-red-500">{errors.cvv}</p>}
+        </div>
+      </div>
+
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="payment-methods">
+          <AccordionTrigger className="text-sm">Other Payment Methods</AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-2 pt-2">
+              <Button variant="outline" className="w-full justify-start" type="button" disabled>
+                <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
+                    fill="#FFD700"
+                    stroke="#FFD700"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Pay with PayPal
+              </Button>
+              <Button variant="outline" className="w-full justify-start" type="button" disabled>
+                <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
+                  <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
+                </svg>
+                Apple Pay
+              </Button>
+              <p className="text-xs text-muted-foreground text-center mt-2">Additional payment methods coming soon</p>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      <div className="pt-2 flex flex-col space-y-2">
+        <Button type="submit" className="w-full" disabled={processing}>
+          {processing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            `Pay $${amount.toFixed(2)}`
+          )}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={processing}>
+          Cancel
+        </Button>
+      </div>
+
+      <div className="text-xs text-center text-muted-foreground">
+        <p>This is a demo application. No actual payment will be processed.</p>
+        <p>You can use any card details for testing.</p>
+      </div>
+    </form>
   )
 }

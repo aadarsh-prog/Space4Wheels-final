@@ -9,14 +9,15 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url)
     const ownerId = searchParams.get("ownerId")
+    const plotId=searchParams.get("plotId")
+    
 
     let result
 
     if (ownerId) {
       result = await adminDbService.plots.getPlotsByOwnerId(ownerId)
-    } else {
-      // For demo purposes, return nearby plots to NYC
-      result = await adminDbService.plots.getNearbyPlots(40.7128, -74.006, 10)
+    } else if(plotId) {
+      result = await adminDbService.plots.getPlotByplotId(plotId)
     }
 
     if (!result.success) {

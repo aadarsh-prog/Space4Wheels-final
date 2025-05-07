@@ -2,204 +2,225 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar } from "@/components/ui/calendar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { MapComponent } from "@/components/map-component"
 import { useToast } from "@/components/ui/use-toast"
-import { MapPin, Clock, Car, Info, Star, Loader2 } from "lucide-react"
-import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api"
 import { useAuth } from "@/lib/firebase/auth-context"
 import { useDatabase } from "@/lib/hooks/use-database"
+import { Clock, MapPin, Star, DollarSign, Car, Loader2, Info, AlertCircle, CheckCircle2 } from "lucide-react"
+import { format } from "date-fns"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { PaymentForm } from "@/components/payment/payment-form"
-import { motion, AnimatePresence } from "framer-motion"
 
-const mapContainerStyle = {
-  width: "100%",
-  height: "100%",
-  borderRadius: "0.375rem",
+// Generate time slots from 6 AM to 10 PM
+const generateTimeSlots = () => {
+  const slots = []
+  for (let hour = 6; hour <= 22; hour++) {
+    const hourFormatted = hour % 12 === 0 ? 12 : hour % 12
+    const period = hour < 12 ? "AM" : "PM"
+    slots.push(`${hourFormatted}:00 ${period}`)
+    slots.push(`${hourFormatted}:30 ${period}`)
+  }
+  return slots
 }
+
+const timeSlots = generateTimeSlots()
+
+// Generate duration options from 1 to 8 hours
+const durationOptions = Array.from({ length: 8 }, (_, i) => i + 1)
 
 export default function PlotDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
-  const { getPlotById, getReviewsByPlotId, createBooking, processPayment, loading } = useDatabase()
+  const { getPlotById, getReviewsByPlotId, createBooking, processPayment } = useDatabase()
 
   const [plot, setPlot] = useState(null)
   const [reviews, setReviews] = useState([])
-  const [date, setDate] = useState(new Date())
-  const [startTime, setStartTime] = useState("09:00")
-  const [endTime, setEndTime] = useState("11:00")
-  const [isLoading, setIsLoading] = useState(true)
-  const [isBooking, setIsBooking] = useState(false)
-  const [showPayment, setShowPayment] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [bookingDate, setBookingDate] = useState(new Date())
+  const [startTime, setStartTime] = useState(timeSlots[8]) // Default to 10:00 AM
+  const [duration, setDuration] = useState(2) // Default to 2 hours
+  const [bookingStep, setBookingStep] = useState(1)
   const [bookingDetails, setBookingDetails] = useState(null)
-  const [bookingStep, setBookingStep] = useState("details") // details, payment, confirmation
+  const [processingBooking, setProcessingBooking] = useState(false)
+  const [bookingError, setBookingError] = useState(null)
+  const [bookingSuccess, setBookingSuccess] = useState(false)
 
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
-    libraries: ["places"],
-  })
-
+  // Fetch plot details and reviews
   useEffect(() => {
-    const fetchPlotDetails = async () => {
-      if (!params.id) return
-
+    const fetchPlotData = async () => {
       try {
-        setIsLoading(true)
+        setLoading(true)
+        const plotData = await fetch(`/api/plots?plotId=${params.id}`);
 
-        // Fetch plot details
-        const plotData = await getPlotById(params.id)
-        if (plotData) {
-          setPlot(plotData)
 
-          // Fetch reviews
-          const reviewsData = await getReviewsByPlotId(params.id)
-          if (reviewsData) {
-            setReviews(reviewsData)
-          }
+        if (!plotData) {
+          toast({
+            title: "Error",
+            description: "Failed to load parking plot details",
+            variant: "destructive",
+          })
+          router.push("/dashboard/find")
+          return
         }
+
+        setPlot(plotData)
+
+        // Fetch reviews
+        const reviewsData = await getReviewsByPlotId(params.id)
+        setReviews(reviewsData || [])
       } catch (error) {
-        console.error("Error fetching plot details:", error)
+        console.error("Error fetching plot data:", error)
         toast({
-          variant: "destructive",
           title: "Error",
-          description: "Failed to load plot details.",
+          description: "Failed to load parking plot details",
+          variant: "destructive",
         })
       } finally {
-        setIsLoading(false)
+        setLoading(false)
       }
     }
 
-    fetchPlotDetails()
-  }, [params.id, getPlotById, getReviewsByPlotId, toast])
+    fetchPlotData()
+  }, [params.id, getPlotById, getReviewsByPlotId, toast, router])
 
-  // Generate time slots for selection
-  const timeSlots = Array.from({ length: 24 }, (_, i) => {
-    const hour = i.toString().padStart(2, "0")
-    return `${hour}:00`
-  })
+  // Calculate booking details
+  const calculateBookingDetails = () => {
+    if (!plot) return null
 
-  const calculateDuration = () => {
-    const start = Number.parseInt(startTime.split(":")[0])
-    const end = Number.parseInt(endTime.split(":")[0])
-    return end > start ? end - start : 24 - start + end
+    // Parse start time
+    const [time, period] = startTime.split(" ")
+    const [hour, minute] = time.split(":")
+    let startHour = Number.parseInt(hour)
+
+    // Convert to 24-hour format
+    if (period === "PM" && startHour !== 12) {
+      startHour += 12
+    } else if (period === "AM" && startHour === 12) {
+      startHour = 0
+    }
+
+    // Create start and end date objects
+    const startDate = new Date(bookingDate)
+    startDate.setHours(startHour, Number.parseInt(minute), 0, 0)
+
+    const endDate = new Date(startDate)
+    endDate.setHours(startDate.getHours() + duration)
+
+    // Calculate total price
+    const totalPrice = plot.price * duration
+
+    return {
+      plotId: plot.id,
+      plotName: plot.name,
+      plotAddress: plot.address,
+      startTime: startDate,
+      endTime: endDate,
+      duration,
+      pricePerHour: plot.price,
+      totalPrice,
+      userId: user?.uid,
+      userName: user?.displayName || user?.email,
+    }
   }
 
-  const calculatePrice = () => {
-    if (!plot) return 0
-    const duration = calculateDuration()
-    return plot.price * duration
-  }
-
-  const handleBookNow = () => {
+  // Handle booking submission
+  const handleBookingSubmit = async () => {
     if (!user) {
       toast({
-        variant: "destructive",
         title: "Authentication Required",
-        description: "Please log in to book a parking spot.",
+        description: "Please log in to book a parking spot",
+        variant: "destructive",
       })
       router.push("/auth/login")
       return
     }
 
-    if (!date) {
-      toast({
-        variant: "destructive",
-        title: "Date Required",
-        description: "Please select a date for your booking.",
-      })
-      return
-    }
+    try {
+      setProcessingBooking(true)
+      setBookingError(null)
 
-    const duration = calculateDuration()
-    if (duration <= 0) {
-      toast({
-        variant: "destructive",
-        title: "Invalid Time Selection",
-        description: "End time must be after start time.",
-      })
-      return
-    }
+      const details = calculateBookingDetails()
+      setBookingDetails(details)
 
-    // Create booking details
-    const bookingData = {
-      userId: user.uid,
-      userName: user.displayName || user.email,
-      plotId: plot.id,
-      plotName: plot.name,
-      plotAddress: plot.address,
-      date: date.toISOString().split("T")[0],
-      startTime,
-      endTime,
-      duration,
-      price: calculatePrice(),
+      // Move to payment step
+      setBookingStep(2)
+    } catch (error) {
+      console.error("Error preparing booking:", error)
+      setBookingError("Failed to prepare booking. Please try again.")
+    } finally {
+      setProcessingBooking(false)
     }
-
-    setBookingDetails(bookingData)
-    setBookingStep("payment")
   }
 
-  const handlePaymentComplete = async (paymentDetails) => {
-    setIsBooking(true)
-
+  // Handle payment submission
+  const handlePaymentSubmit = async (paymentDetails) => {
     try {
+      setProcessingBooking(true)
+      setBookingError(null)
+
       // Create booking
-      const bookingResult = await createBooking({
-        ...bookingDetails,
-        paymentStatus: "pending",
-      })
+      const bookingResult = await createBooking(bookingDetails)
 
       if (!bookingResult) {
         throw new Error("Failed to create booking")
       }
 
       // Process payment
-      const paymentResult = await processPayment(bookingResult.id, paymentDetails)
+      const paymentResult = await processPayment(bookingResult.id, {
+        amount: bookingDetails.totalPrice,
+        ...paymentDetails,
+      })
 
       if (!paymentResult) {
-        throw new Error("Failed to process payment")
+        throw new Error("Payment processing failed")
       }
 
-      setBookingStep("confirmation")
+      // Show success message
+      setBookingSuccess(true)
+      setBookingStep(3)
 
       toast({
-        title: "Booking Confirmed!",
-        description: `You have successfully booked a parking spot at ${plot.name}.`,
+        title: "Booking Successful",
+        description: "Your parking spot has been booked successfully!",
       })
-
-      // Wait a moment before redirecting
-      setTimeout(() => {
-        router.push("/dashboard/bookings")
-      }, 3000)
     } catch (error) {
-      console.error("Error completing booking:", error)
-      toast({
-        variant: "destructive",
-        title: "Booking Failed",
-        description: "There was an error processing your booking. Please try again.",
-      })
-      setBookingStep("details")
+      console.error("Error processing booking:", error)
+      setBookingError(`Booking failed: ${error.message}`)
     } finally {
-      setIsBooking(false)
+      setProcessingBooking(false)
     }
   }
 
-  const handleCancelPayment = () => {
-    setBookingStep("details")
+  // Handle booking cancellation
+  const handleCancelBooking = () => {
+    setBookingStep(1)
     setBookingDetails(null)
+    setBookingError(null)
   }
 
-  if (isLoading) {
+  // View booking details
+  const viewBookingDetails = () => {
+    router.push("/dashboard/bookings")
+  }
+
+  // Find another spot
+  const findAnotherSpot = () => {
+    router.push("/dashboard/find")
+  }
+
+  if (loading) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="container mx-auto py-8 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-lg font-medium">Loading parking details...</p>
         </div>
       </div>
     )
@@ -208,366 +229,404 @@ export default function PlotDetailPage() {
   if (!plot) {
     return (
       <div className="container mx-auto py-8">
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-red-500">Parking plot not found.</p>
-            <Button className="mt-4" onClick={() => router.push("/dashboard/find")}>
-              Back to Find Parking
-            </Button>
-          </CardContent>
-        </Card>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>
+            Failed to load parking details. The parking spot may not exist or has been removed.
+          </AlertDescription>
+        </Alert>
+        <div className="mt-4 flex justify-center">
+          <Button onClick={() => router.push("/dashboard/find")}>Find Another Spot</Button>
+        </div>
       </div>
     )
   }
 
-  // For demo purposes, use dummy data if needed
-  const displayPlot = {
-    ...plot,
-    images:
-      plot.images && plot.images.length > 0
-        ? plot.images
-        : ["/placeholder.svg?height=300&width=500", "/placeholder.svg?height=300&width=500"],
-    features: plot.features || ["24/7 Access", "Security Cameras", "Covered Parking", "Well Lit"],
-  }
-
-  const displayReviews =
-    reviews.length > 0
-      ? reviews
-      : [
-          {
-            id: "review1",
-            userId: "user1",
-            userName: "John D.",
-            rating: 4,
-            comment: "Great location, easy to find and use.",
-            createdAt: "2023-04-15T00:00:00.000Z",
-          },
-          {
-            id: "review2",
-            userId: "user2",
-            userName: "Sarah M.",
-            rating: 5,
-            comment: "Very convenient and safe. Will use again!",
-            createdAt: "2023-04-10T00:00:00.000Z",
-          },
-        ]
-
   return (
-    <div className="container mx-auto">
-      <div className="grid gap-6">
-        <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">{displayPlot.name}</h1>
-            <p className="text-muted-foreground flex items-center gap-1 mt-1">
-              <MapPin className="h-4 w-4" />
-              {displayPlot.address}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold">${displayPlot.price}</span>
-            <span className="text-muted-foreground">/hour</span>
-          </div>
+    <div className="container mx-auto py-8">
+      <div className="mb-6">
+        <Button variant="ghost" className="mb-2" onClick={() => router.push("/dashboard/find")}>
+          &larr; Back to Search
+        </Button>
+        <h1 className="text-3xl font-bold">{plot.name}</h1>
+        <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+          <MapPin className="h-4 w-4" />
+          <span>{plot.address}</span>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardContent className="p-0">
-                <Carousel className="w-full">
-                  <CarouselContent>
-                    {displayPlot.images.map((image, index) => (
-                      <CarouselItem key={index}>
-                        <div className="p-1">
-                          <div className="overflow-hidden rounded-lg">
-                            <Image
-                              src={image || "/placeholder.svg"}
-                              alt={`${displayPlot.name} - Image ${index + 1}`}
-                              width={800}
-                              height={400}
-                              className="aspect-[2/1] w-full object-cover"
-                            />
-                          </div>
-                        </div>
-                      </CarouselItem>
-                    ))}
-                  </CarouselContent>
-                  <CarouselPrevious className="left-4" />
-                  <CarouselNext className="right-4" />
-                </Carousel>
-              </CardContent>
-            </Card>
+      {bookingError && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{bookingError}</AlertDescription>
+        </Alert>
+      )}
 
-            <Tabs defaultValue="details">
-              <TabsList>
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="features">Features</TabsTrigger>
-                <TabsTrigger value="reviews">Reviews</TabsTrigger>
-              </TabsList>
+      {bookingSuccess && (
+        <Alert className="mb-6 bg-green-50 border-green-200">
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <AlertTitle>Booking Successful!</AlertTitle>
+          <AlertDescription>
+            Your parking spot has been booked successfully. You can view your booking details in your dashboard.
+          </AlertDescription>
+        </Alert>
+      )}
 
-              <TabsContent value="details" className="mt-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="space-y-4">
-                      <p>{displayPlot.description}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardContent className="p-0">
+              <div className="h-[300px] w-full rounded-t-md overflow-hidden">
+                <MapComponent plots={[plot]} selectedPlotId={plot.id} userLocation={null} />
+              </div>
+            </CardContent>
+          </Card>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center gap-2">
-                          <Car className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">Available Slots</p>
-                            <p className="text-sm text-muted-foreground">
-                              {displayPlot.availableSlots} of {displayPlot.totalSlots}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">Operating Hours</p>
-                            <p className="text-sm text-muted-foreground">24/7</p>
-                          </div>
-                        </div>
+          <Tabs defaultValue="details">
+            <TabsList className="mb-4">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="reviews">Reviews ({reviews.length})</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="details">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Parking Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-start gap-2">
+                      <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <h3 className="font-medium">Price</h3>
+                        <p>${plot.price}/hour</p>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                    <div className="flex items-start gap-2">
+                      <Car className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <h3 className="font-medium">Availability</h3>
+                        <p>
+                          {plot.availableSlots}/{plot.totalSlots} spots available
+                        </p>
+                      </div>
+                    </div>
+                    {plot.rating && (
+                      <div className="flex items-start gap-2">
+                        <Star className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <h3 className="font-medium">Rating</h3>
+                          <p>
+                            {plot.rating.toFixed(1)}/5 ({plot.reviewCount} reviews)
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-start gap-2">
+                      <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <h3 className="font-medium">Hours</h3>
+                        <p>Open 24/7</p>
+                      </div>
+                    </div>
+                  </div>
 
-              <TabsContent value="features" className="mt-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {displayPlot.features.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2">
-                          <div className="h-2 w-2 rounded-full bg-primary" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                  {plot.description && (
+                    <div className="mt-4">
+                      <h3 className="font-medium mb-2">Description</h3>
+                      <p className="text-muted-foreground">{plot.description}</p>
+                    </div>
+                  )}
 
-              <TabsContent value="reviews" className="mt-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    {displayReviews.length === 0 ? (
-                      <p className="text-center text-muted-foreground">No reviews yet.</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {displayReviews.map((review) => (
-                          <div key={review.id} className="border-b pb-4 last:border-0 last:pb-0">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium">{review.userName}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {new Date(review.createdAt).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <div className="flex">
+                  {plot.features && plot.features.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="font-medium mb-2">Features</h3>
+                      <ul className="grid grid-cols-2 gap-2">
+                        {plot.features.map((feature, index) => (
+                          <li key={index} className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="reviews">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Customer Reviews</CardTitle>
+                  {plot.rating && (
+                    <CardDescription>
+                      {plot.rating.toFixed(1)}/5 ({plot.reviewCount} reviews)
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {reviews.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">
+                      No reviews yet. Be the first to leave a review!
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {reviews.map((review) => (
+                        <div key={review.id} className="border-b pb-4 last:border-0">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="font-medium">{review.userName}</p>
+                              <div className="flex items-center gap-1 text-amber-500">
                                 {Array.from({ length: 5 }).map((_, i) => (
                                   <Star
                                     key={i}
-                                    className={`h-4 w-4 ${
-                                      i < review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
-                                    }`}
+                                    className={`h-4 w-4 ${i < review.rating ? "fill-current" : "text-gray-300"}`}
                                   />
                                 ))}
                               </div>
                             </div>
-                            <p className="mt-2">{review.comment}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          <div className="space-y-6">
-            <AnimatePresence mode="wait">
-              {bookingStep === "details" && (
-                <motion.div
-                  key="booking-details"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Card>
-                    <CardContent className="pt-6">
-                      <h3 className="text-lg font-semibold mb-4">Book a Parking Spot</h3>
-
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm font-medium mb-2">Select Date</p>
-                          <Calendar
-                            mode="single"
-                            selected={date}
-                            onSelect={setDate}
-                            className="border rounded-md"
-                            disabled={(date) => date < new Date()}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm font-medium mb-2">Start Time</p>
-                            <Select value={startTime} onValueChange={setStartTime}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select start time" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {timeSlots.map((time) => (
-                                  <SelectItem key={time} value={time}>
-                                    {time}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div>
-                            <p className="text-sm font-medium mb-2">End Time</p>
-                            <Select value={endTime} onValueChange={setEndTime}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select end time" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {timeSlots.map((time) => (
-                                  <SelectItem key={time} value={time}>
-                                    {time}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="border-t pt-4 mt-4">
-                          <div className="flex justify-between mb-2">
-                            <span>Parking Fee</span>
-                            <span>
-                              ${displayPlot.price} x {calculateDuration()} hours
+                            <span className="text-sm text-muted-foreground">
+                              {review.createdAt
+                                ? format(new Date(review.createdAt.seconds * 1000), "MMM d, yyyy")
+                                : "Recent"}
                             </span>
                           </div>
-                          <div className="flex justify-between font-bold text-lg">
-                            <span>Total</span>
-                            <span>${calculatePrice()}</span>
-                          </div>
+                          <p className="mt-2 text-muted-foreground">{review.comment}</p>
                         </div>
-
-                        <Button className="w-full" onClick={handleBookNow} disabled={isBooking || !date}>
-                          {isBooking ? "Processing..." : "Book Now"}
-                        </Button>
-
-                        <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                          <p>You won't be charged until you confirm your booking.</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-
-              {bookingStep === "payment" && (
-                <motion.div
-                  key="payment-form"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <PaymentForm
-                    amount={calculatePrice()}
-                    onPaymentComplete={handlePaymentComplete}
-                    onCancel={handleCancelPayment}
-                    bookingDetails={bookingDetails}
-                  />
-                </motion.div>
-              )}
-
-              {bookingStep === "confirmation" && (
-                <motion.div
-                  key="booking-confirmation"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Card>
-                    <CardContent className="pt-6 text-center">
-                      <div className="flex flex-col items-center justify-center py-6">
-                        <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                          <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <h3 className="text-xl font-bold mb-2">Booking Confirmed!</h3>
-                        <p className="text-muted-foreground mb-4">Your parking spot has been successfully booked.</p>
-                        <div className="bg-muted p-4 rounded-md text-left w-full mb-4">
-                          <h4 className="font-medium mb-2">Booking Details</h4>
-                          <div className="space-y-1 text-sm">
-                            <p>
-                              <span className="text-muted-foreground">Location:</span> {bookingDetails?.plotName}
-                            </p>
-                            <p>
-                              <span className="text-muted-foreground">Date:</span> {bookingDetails?.date}
-                            </p>
-                            <p>
-                              <span className="text-muted-foreground">Time:</span> {bookingDetails?.startTime} -{" "}
-                              {bookingDetails?.endTime}
-                            </p>
-                            <p>
-                              <span className="text-muted-foreground">Total:</span> ${calculatePrice()}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-sm text-muted-foreground">Redirecting to your bookings...</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold mb-4">Location</h3>
-                <div className="aspect-video bg-muted rounded-md overflow-hidden">
-                  {isLoaded ? (
-                    <GoogleMap
-                      mapContainerStyle={mapContainerStyle}
-                      center={{ lat: displayPlot.lat, lng: displayPlot.lng }}
-                      zoom={15}
-                      options={{
-                        fullscreenControl: false,
-                        streetViewControl: false,
-                        mapTypeControl: false,
-                      }}
-                    >
-                      <Marker
-                        position={{ lat: displayPlot.lat, lng: displayPlot.lng }}
-                        icon={{
-                          url: "/marker-selected.svg",
-                          scaledSize: new window.google.maps.Size(40, 40),
-                        }}
-                      />
-                    </GoogleMap>
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center p-4">
-                        <p className="text-sm text-muted-foreground">Loading map...</p>
-                      </div>
+                      ))}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <div className="space-y-6">
+          {bookingStep === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Book This Spot</CardTitle>
+                <CardDescription>Select your parking date and time</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Date</label>
+                  <CalendarComponent
+                    mode="single"
+                    selected={bookingDate}
+                    onSelect={setBookingDate}
+                    disabled={(date) => date < new Date()}
+                    className="rounded-md border"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Start Time</label>
+                  <Select value={startTime} onValueChange={setStartTime}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select start time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeSlots.map((time) => (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Duration (hours)</label>
+                  <Select value={duration.toString()} onValueChange={(value) => setDuration(Number.parseInt(value))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select duration" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {durationOptions.map((hours) => (
+                        <SelectItem key={hours} value={hours.toString()}>
+                          {hours} hour{hours > 1 ? "s" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="pt-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Price per hour:</span>
+                    <span className="font-medium">${plot.price}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Duration:</span>
+                    <span className="font-medium">
+                      {duration} hour{duration > 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="flex justify-between font-medium mt-2 pt-2 border-t">
+                    <span>Total:</span>
+                    <span>${(plot.price * duration).toFixed(2)}</span>
+                  </div>
                 </div>
               </CardContent>
+              <CardFooter>
+                <Button
+                  className="w-full"
+                  onClick={handleBookingSubmit}
+                  disabled={processingBooking || plot.availableSlots < 1}
+                >
+                  {processingBooking ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : plot.availableSlots < 1 ? (
+                    "No Spots Available"
+                  ) : (
+                    "Continue to Payment"
+                  )}
+                </Button>
+              </CardFooter>
             </Card>
-          </div>
+          )}
+
+          {bookingStep === 2 && bookingDetails && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment</CardTitle>
+                <CardDescription>Complete your booking by making a payment</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-muted p-3 rounded-md space-y-2">
+                  <h3 className="font-medium">Booking Summary</h3>
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Location:</span>
+                      <span>{bookingDetails.plotName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Date:</span>
+                      <span>{format(bookingDetails.startTime, "MMM d, yyyy")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Time:</span>
+                      <span>
+                        {format(bookingDetails.startTime, "h:mm a")} - {format(bookingDetails.endTime, "h:mm a")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Duration:</span>
+                      <span>
+                        {bookingDetails.duration} hour{bookingDetails.duration > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-medium pt-1 mt-1 border-t">
+                      <span>Total:</span>
+                      <span>${bookingDetails.totalPrice.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <PaymentForm
+                  amount={bookingDetails.totalPrice}
+                  onSubmit={handlePaymentSubmit}
+                  onCancel={handleCancelBooking}
+                  processing={processingBooking}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {bookingStep === 3 && bookingSuccess && (
+            <Card>
+              <CardHeader className="text-center pb-3">
+                <div className="mx-auto bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mb-2">
+                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                </div>
+                <CardTitle>Booking Confirmed!</CardTitle>
+                <CardDescription>Your parking spot has been successfully booked</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-muted p-3 rounded-md space-y-2">
+                  <h3 className="font-medium">Booking Details</h3>
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Location:</span>
+                      <span>{bookingDetails.plotName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Date:</span>
+                      <span>{format(bookingDetails.startTime, "MMM d, yyyy")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Time:</span>
+                      <span>
+                        {format(bookingDetails.startTime, "h:mm a")} - {format(bookingDetails.endTime, "h:mm a")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-medium pt-1 mt-1 border-t">
+                      <span>Total Paid:</span>
+                      <span>${bookingDetails.totalPrice.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Important Information</AlertTitle>
+                  <AlertDescription>
+                    Please arrive on time. Your booking confirmation has been sent to your email.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+              <CardFooter className="flex flex-col space-y-2">
+                <Button className="w-full" onClick={viewBookingDetails}>
+                  View All Bookings
+                </Button>
+                <Button variant="outline" className="w-full" onClick={findAnotherSpot}>
+                  Find Another Spot
+                </Button>
+              </CardFooter>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Location</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="font-medium">{plot.address}</p>
+                    {plot.distance && (
+                      <p className="text-sm text-muted-foreground">
+                        {plot.distance.toFixed(1)} miles from your location
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {plot.features && plot.features.includes("EV Charging") && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">EV Charging Available</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  This parking location offers electric vehicle charging stations. Additional fees may apply.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

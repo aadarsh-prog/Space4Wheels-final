@@ -1,48 +1,40 @@
 import { NextResponse } from "next/server"
+import { getPlotsByRadius } from "@/lib/firebase/admin-database/plots"
 
 export async function GET(request) {
   try {
-    // In a real app, you would fetch nearby plots based on user location
-    // For demo purposes, we'll return mock data
-    const nearbyPlots = [
-      {
-        id: "plot1",
-        name: "Downtown Parking",
-        address: "123 Main St, Downtown",
-        price: 5,
-        availableSlots: 8,
-        totalSlots: 15,
-        distance: 0.5,
-        lat: 40.7128,
-        lng: -74.006,
-      },
-      {
-        id: "plot2",
-        name: "Central Mall Parking",
-        address: "456 Market Ave, Central",
-        price: 7,
-        availableSlots: 12,
-        totalSlots: 30,
-        distance: 1.2,
-        lat: 40.7138,
-        lng: -74.013,
-      },
-      {
-        id: "plot3",
-        name: "City Center Parking",
-        address: "789 Center Blvd, Midtown",
-        price: 6,
-        availableSlots: 5,
-        totalSlots: 20,
-        distance: 1.8,
-        lat: 40.7148,
-        lng: -74.001,
-      },
-    ]
+    const { searchParams } = new URL(request.url)
 
-    return NextResponse.json(nearbyPlots)
+    // Get parameters from the request
+    const lat = Number.parseFloat(searchParams.get("lat") || "0")
+    const lng = Number.parseFloat(searchParams.get("lng") || "0")
+    const radius = Number.parseFloat(searchParams.get("radius") || "5")
+    const query = searchParams.get("query") || ""
+
+    // Validate coordinates
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+      console.error("Invalid coordinates provided:", { lat, lng })
+      return NextResponse.json({ success: false, error: "Invalid coordinates", data: [] }, { status: 400 })
+    }
+
+    console.log(`Searching for plots near [${lat}, ${lng}] within ${radius} miles`)
+
+    // Get plots within the specified radius
+    const result = await getPlotsByRadius(lat, lng, radius, query)
+
+    if (!result.success) {
+      console.error("Error in getPlotsByRadius:", result.error)
+      return NextResponse.json({ success: false, error: result.error, data: [] }, { status: 500 })
+    }
+
+    console.log(`Found ${result.data.length} plots within ${radius} miles`)
+
+    return NextResponse.json({
+      success: true,
+      data: result.data,
+    })
   } catch (error) {
     console.error("Error fetching nearby plots:", error)
-    return NextResponse.json({ error: "Failed to fetch nearby plots" }, { status: 500 })
+    return NextResponse.json({ success: false, error: "Failed to fetch nearby plots", data: [] }, { status: 500 })
   }
 }

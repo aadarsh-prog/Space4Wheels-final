@@ -38,7 +38,7 @@ const mapStyles = [
   },
 ]
 
-export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation }) {
+export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation, searchRadius = 5 }) {
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
     libraries,
@@ -53,6 +53,9 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
   })
   const mapRef = useRef(null)
 
+  // Convert miles to meters for the circle radius
+  const radiusInMeters = searchRadius * 1609.34
+
   const onLoad = useCallback(
     (map) => {
       mapRef.current = map
@@ -61,7 +64,7 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
       // If we have user location, center the map there
       if (userLocation) {
         map.setCenter(userLocation)
-        map.setZoom(14)
+        map.setZoom(calculateZoomLevel(searchRadius))
       }
       // If we have plots, fit the map to their bounds
       else if (plots && plots.length > 0) {
@@ -79,16 +82,27 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
         }
       }
     },
-    [plots, userLocation],
+    [plots, userLocation, searchRadius],
   )
 
-  // This effect will update the map when plots or user location changes
+  // Calculate appropriate zoom level based on radius
+  const calculateZoomLevel = (radiusMiles) => {
+    // This is a rough approximation
+    if (radiusMiles <= 1) return 15
+    if (radiusMiles <= 2) return 14
+    if (radiusMiles <= 5) return 13
+    if (radiusMiles <= 10) return 12
+    if (radiusMiles <= 15) return 11
+    return 10 // For larger radii
+  }
+
+  // This effect will update the map when plots, user location, or search radius changes
   useEffect(() => {
     if (!map) return
 
     if (userLocation) {
       map.setCenter(userLocation)
-      map.setZoom(14)
+      map.setZoom(calculateZoomLevel(searchRadius))
     } else if (plots && plots.length > 0) {
       const bounds = new window.google.maps.LatLngBounds()
       let validPlots = 0
@@ -109,7 +123,7 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
         }
       }
     }
-  }, [plots, userLocation, map])
+  }, [plots, userLocation, map, searchRadius])
 
   const onUnmount = useCallback(() => {
     setMap(null)
@@ -187,7 +201,7 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
         {mapLayers.transit && <TransitLayer />}
         {mapLayers.bicycling && <BicyclingLayer />}
 
-        {/* User Location */}
+        {/* User Location and Search Radius */}
         {userLocation && (
           <>
             <Marker
@@ -203,12 +217,12 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
             />
             <Circle
               center={userLocation}
-              radius={1000}
+              radius={radiusInMeters}
               options={{
                 fillColor: "#4285F4",
                 fillOpacity: 0.1,
                 strokeColor: "#4285F4",
-                strokeOpacity: 0.3,
+                strokeOpacity: 0.5,
                 strokeWeight: 1,
               }}
             />
@@ -239,6 +253,16 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
                       <p className="text-xs text-gray-600">
                         {plot.availableSlots}/{plot.totalSlots} spots available
                       </p>
+                      <p className="text-xs text-gray-600 mt-1">{plot.distance.toFixed(1)} miles away</p>
+                      <button
+                        className="text-xs text-blue-600 mt-1 hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          window.location.href = `/dashboard/plots/${plot.id}`
+                        }}
+                      >
+                        Book Now
+                      </button>
                     </div>
                   </InfoWindow>
                 )}
@@ -269,6 +293,11 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
             Bicycling
           </button>
         </div>
+      </div>
+
+      {/* Search Radius Indicator */}
+      <div className="absolute bottom-4 left-4 bg-white p-2 rounded-md shadow-md z-10">
+        <div className="text-xs font-medium">Search Radius: {searchRadius} miles</div>
       </div>
     </div>
   )

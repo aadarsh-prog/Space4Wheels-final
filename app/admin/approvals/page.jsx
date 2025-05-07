@@ -52,7 +52,7 @@ export default function PlotApprovalsPage() {
         setIsLoading(true)
 
         // Fetch pending plots
-        const pendingResponse = await fetch("/api/admin/plots/pending")
+        const pendingResponse = await fetch("/api/admin/plots/status?status=pending")
         if (!pendingResponse.ok) {
           throw new Error("Failed to fetch pending plots")
         }

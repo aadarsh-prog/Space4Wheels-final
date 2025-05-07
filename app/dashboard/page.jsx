@@ -61,13 +61,22 @@ export default function UserDashboard() {
 
         // Fetch nearby plots
         const nearbyResponse = await fetch(
-          `/api/plots/nearby?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=10`,
+          `/api/plots/nearby?lat=${userLocation.lat}&lng=${userLocation.lng}&radius=20`,
         )
         if (nearbyResponse.ok) {
           const nearbyData = await nearbyResponse.json()
-          setNearbyPlots(nearbyData)
+          // Check if the response has a data property and it's an array
+          if (nearbyData.success && Array.isArray(nearbyData.data)) {
+            setNearbyPlots(nearbyData.data)
+          } else if (Array.isArray(nearbyData)) {
+            setNearbyPlots(nearbyData)
+          } else {
+            console.error("Unexpected nearby plots response format:", nearbyData)
+            setNearbyPlots([])
+          }
         } else {
           console.error("Failed to fetch nearby plots:", await nearbyResponse.text())
+          setNearbyPlots([])
         }
 
         // Fetch user's bookings

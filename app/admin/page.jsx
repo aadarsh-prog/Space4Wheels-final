@@ -33,7 +33,7 @@ export default function AdminDashboard() {
         }
 
         // Fetch pending plots
-        const pendingPlotsResponse = await fetch("/api/admin/plots/pending")
+        const pendingPlotsResponse = await fetch("/api/admin/plots/status?status=pending")
         if (pendingPlotsResponse.ok) {
           const pendingPlotsData = await pendingPlotsResponse.json()
           setPendingPlots(pendingPlotsData)
