@@ -105,13 +105,16 @@ export default function FindParkingPage() {
         const data = await response.json()
         setSearchProgress(100)
 
-        if (data.success && data.data && data.data.length > 0) {
-          console.log(`Found ${data.data.length} plots within ${radius} miles`, data.data)
+        // Ensure we have a valid data array
+        const plotsData = Array.isArray(data.data) ? data.data : []
+
+        if (data.success && plotsData.length > 0) {
+          console.log(`Found ${plotsData.length} plots within ${radius} miles`, plotsData)
           // Sort plots by distance
-          const sortedPlots = sortPlots(data.data, sortBy)
+          const sortedPlots = sortPlots(plotsData, sortBy)
           setPlots(sortedPlots)
           setFilteredPlots(sortedPlots)
-          setSearchStatus(`Found ${data.data.length} parking spots near you!`)
+          setSearchStatus(`Found ${plotsData.length} parking spots near you!`)
           return true // Results found
         } else {
           console.log(`No plots found within ${radius} miles`)
@@ -123,6 +126,8 @@ export default function FindParkingPage() {
       } catch (error) {
         console.error("Error fetching nearby plots:", error)
         setSearchError(`Error searching for parking: ${error.message}`)
+        setPlots([])
+        setFilteredPlots([])
         return false
       } finally {
         setIsSearching(false)
@@ -249,6 +254,11 @@ export default function FindParkingPage() {
 
   // Sort plots based on selected criteria
   const sortPlots = (plotsToSort, sortCriteria) => {
+    if (!Array.isArray(plotsToSort)) {
+      console.error("sortPlots received non-array:", plotsToSort)
+      return []
+    }
+
     return [...plotsToSort].sort((a, b) => {
       switch (sortCriteria) {
         case "distance":
@@ -265,7 +275,10 @@ export default function FindParkingPage() {
 
   // Apply filters and sorting
   useEffect(() => {
-    if (plots.length === 0) return
+    if (!Array.isArray(plots) || plots.length === 0) {
+      setFilteredPlots([])
+      return
+    }
 
     let filtered = plots.filter((plot) => plot.price <= maxPrice && plot.availableSlots >= minAvailability)
 
@@ -296,6 +309,13 @@ export default function FindParkingPage() {
     setMaxPrice(15)
     setMinAvailability(1)
     setSortBy("distance")
+  }
+
+  // Apply filters and search again
+  const applyFilters = () => {
+    if (userLocation) {
+      fetchNearbyPlots(userLocation.lat, userLocation.lng, searchRadius)
+    }
   }
 
   return (
@@ -407,7 +427,7 @@ export default function FindParkingPage() {
                     Reset
                   </Button>
                   <SheetClose asChild>
-                    <Button>Apply Filters</Button>
+                    <Button onClick={applyFilters}>Apply Filters</Button>
                   </SheetClose>
                 </SheetFooter>
               </SheetContent>
@@ -511,15 +531,15 @@ export default function FindParkingPage() {
                 </div>
               ) : (
                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                  {filteredPlots.length === 0 ? (
+                  {!Array.isArray(filteredPlots) || filteredPlots.length === 0 ? (
                     <div className="text-center py-8 space-y-4">
                       <p className="text-muted-foreground">No parking spots found matching your criteria.</p>
-                      {plots.length > 0 && (
+                      {Array.isArray(plots) && plots.length > 0 && (
                         <Button variant="outline" onClick={resetFilters}>
                           Reset Filters
                         </Button>
                       )}
-                      {plots.length === 0 && !expandingSearch && (
+                      {(!Array.isArray(plots) || plots.length === 0) && !expandingSearch && (
                         <Button onClick={expandSearchRadius}>Expand Search Radius</Button>
                       )}
                     </div>
@@ -597,7 +617,7 @@ export default function FindParkingPage() {
                         </div>
                       ) : (
                         <MapComponent
-                          plots={filteredPlots}
+                          plots={Array.isArray(filteredPlots) ? filteredPlots : []}
                           selectedPlotId={selectedPlot}
                           onSelectPlot={handleSelectPlot}
                           userLocation={userLocation}
@@ -616,7 +636,7 @@ export default function FindParkingPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredPlots.length === 0 ? (
+                    {!Array.isArray(filteredPlots) || filteredPlots.length === 0 ? (
                       <p className="col-span-2 text-center text-muted-foreground py-4">
                         No parking spots found matching your criteria.
                       </p>

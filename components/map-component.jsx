@@ -53,6 +53,9 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
   })
   const mapRef = useRef(null)
 
+  // Ensure plots is always an array
+  const safetyPlots = Array.isArray(plots) ? plots : []
+
   // Convert miles to meters for the circle radius
   const radiusInMeters = searchRadius * 1609.34
 
@@ -67,9 +70,9 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
         map.setZoom(calculateZoomLevel(searchRadius))
       }
       // If we have plots, fit the map to their bounds
-      else if (plots && plots.length > 0) {
+      else if (safetyPlots.length > 0) {
         const bounds = new window.google.maps.LatLngBounds()
-        plots.forEach((plot) => {
+        safetyPlots.forEach((plot) => {
           if (plot.lat && plot.lng) {
             bounds.extend({ lat: plot.lat, lng: plot.lng })
           }
@@ -77,12 +80,12 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
         map.fitBounds(bounds)
 
         // If there's only one plot, zoom out a bit
-        if (plots.length === 1) {
+        if (safetyPlots.length === 1) {
           map.setZoom(15)
         }
       }
     },
-    [plots, userLocation, searchRadius],
+    [safetyPlots, userLocation, searchRadius],
   )
 
   // Calculate appropriate zoom level based on radius
@@ -103,11 +106,11 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
     if (userLocation) {
       map.setCenter(userLocation)
       map.setZoom(calculateZoomLevel(searchRadius))
-    } else if (plots && plots.length > 0) {
+    } else if (safetyPlots.length > 0) {
       const bounds = new window.google.maps.LatLngBounds()
       let validPlots = 0
 
-      plots.forEach((plot) => {
+      safetyPlots.forEach((plot) => {
         if (plot.lat && plot.lng) {
           bounds.extend({ lat: plot.lat, lng: plot.lng })
           validPlots++
@@ -123,27 +126,30 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
         }
       }
     }
-  }, [plots, userLocation, map, searchRadius])
+  }, [safetyPlots, userLocation, map, searchRadius])
 
   const onUnmount = useCallback(() => {
     setMap(null)
   }, [])
 
   const handleMarkerClick = (plotId) => {
-    onSelectPlot(plotId)
+    if (onSelectPlot) {
+      onSelectPlot(plotId)
+    }
     setActiveMarker(plotId)
   }
 
   // Update map when selectedPlotId changes
   useEffect(() => {
     if (map && selectedPlotId) {
-      const selectedPlot = plots.find((plot) => plot.id === selectedPlotId)
+      const selectedPlot = safetyPlots.find((plot) => plot.id === selectedPlotId)
       if (selectedPlot && selectedPlot.lat && selectedPlot.lng) {
         map.panTo({ lat: selectedPlot.lat, lng: selectedPlot.lng })
         map.setZoom(16)
+        setActiveMarker(selectedPlotId)
       }
     }
-  }, [selectedPlotId, map, plots])
+  }, [selectedPlotId, map, safetyPlots])
 
   // Toggle map layers
   const toggleLayer = (layerName) => {
@@ -230,9 +236,8 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
         )}
 
         {/* Plot Markers */}
-        {plots &&
-          plots.length > 0 &&
-          plots.map((plot) => {
+        {safetyPlots.length > 0 &&
+          safetyPlots.map((plot) => {
             if (!plot.lat || !plot.lng) return null
             return (
               <Marker
@@ -253,7 +258,9 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
                       <p className="text-xs text-gray-600">
                         {plot.availableSlots}/{plot.totalSlots} spots available
                       </p>
-                      <p className="text-xs text-gray-600 mt-1">{plot.distance.toFixed(1)} miles away</p>
+                      {plot.distance && (
+                        <p className="text-xs text-gray-600 mt-1">{plot.distance.toFixed(1)} miles away</p>
+                      )}
                       <button
                         className="text-xs text-blue-600 mt-1 hover:underline"
                         onClick={(e) => {
@@ -296,9 +303,11 @@ export function MapComponent({ plots, selectedPlotId, onSelectPlot, userLocation
       </div>
 
       {/* Search Radius Indicator */}
-      <div className="absolute bottom-4 left-4 bg-white p-2 rounded-md shadow-md z-10">
-        <div className="text-xs font-medium">Search Radius: {searchRadius} miles</div>
-      </div>
+      {userLocation && (
+        <div className="absolute bottom-4 left-4 bg-white p-2 rounded-md shadow-md z-10">
+          <div className="text-xs font-medium">Search Radius: {searchRadius} miles</div>
+        </div>
+      )}
     </div>
   )
 }

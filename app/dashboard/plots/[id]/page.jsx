@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MapComponent } from "@/components/map-component"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/lib/firebase/auth-context"
-import { useDatabase } from "@/lib/hooks/use-database"
 import { Clock, MapPin, Star, DollarSign, Car, Loader2, Info, AlertCircle, CheckCircle2 } from "lucide-react"
 import { format } from "date-fns"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -38,7 +37,6 @@ export default function PlotDetailPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { user } = useAuth()
-  const { getPlotById, getReviewsByPlotId, createBooking, processPayment } = useDatabase()
 
   const [plot, setPlot] = useState(null)
   const [reviews, setReviews] = useState([])
@@ -57,29 +55,45 @@ export default function PlotDetailPage() {
     const fetchPlotData = async () => {
       try {
         setLoading(true)
-        const plotData = await fetch(`/api/plots?plotId=${params.id}`);
 
-
-        if (!plotData) {
-          toast({
-            title: "Error",
-            description: "Failed to load parking plot details",
-            variant: "destructive",
-          })
-          router.push("/dashboard/find")
-          return
+        if (!params.id) {
+          throw new Error("Plot ID is missing")
         }
 
-        setPlot(plotData)
+        // Fetch plot details
+        const plotResponse = await fetch(`/api/plots/${params.id}`)
+
+        if (!plotResponse.ok) {
+          const errorData = await plotResponse.json()
+          throw new Error(errorData.error || "Failed to fetch plot details")
+        }
+
+        const plotData = await plotResponse.json()
+
+        if (!plotData.success || !plotData.data) {
+          throw new Error("Invalid plot data received")
+        }
+
+        console.log("Plot data received:", plotData.data)
+        setPlot(plotData.data)
 
         // Fetch reviews
-        const reviewsData = await getReviewsByPlotId(params.id)
-        setReviews(reviewsData || [])
+        try {
+          const reviewsResponse = await fetch(`/api/reviews?plotId=${params.id}`)
+          if (reviewsResponse.ok) {
+            const reviewsData = await reviewsResponse.json()
+            setReviews(reviewsData.data || [])
+          }
+        } catch (reviewError) {
+          console.error("Error fetching reviews:", reviewError)
+          // Don't fail the whole page if reviews can't be loaded
+          setReviews([])
+        }
       } catch (error) {
         console.error("Error fetching plot data:", error)
         toast({
           title: "Error",
-          description: "Failed to load parking plot details",
+          description: `Failed to load parking plot details: ${error.message}`,
           variant: "destructive",
         })
       } finally {
@@ -88,7 +102,7 @@ export default function PlotDetailPage() {
     }
 
     fetchPlotData()
-  }, [params.id, getPlotById, getReviewsByPlotId, toast, router])
+  }, [params.id, toast])
 
   // Calculate booking details
   const calculateBookingDetails = () => {
@@ -166,20 +180,37 @@ export default function PlotDetailPage() {
       setBookingError(null)
 
       // Create booking
-      const bookingResult = await createBooking(bookingDetails)
-
-      if (!bookingResult) {
-        throw new Error("Failed to create booking")
-      }
-
-      // Process payment
-      const paymentResult = await processPayment(bookingResult.id, {
-        amount: bookingDetails.totalPrice,
-        ...paymentDetails,
+      const bookingResponse = await fetch("/api/bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bookingDetails),
       })
 
-      if (!paymentResult) {
-        throw new Error("Payment processing failed")
+      if (!bookingResponse.ok) {
+        const errorData = await bookingResponse.json()
+        throw new Error(errorData.error || "Failed to create booking")
+      }
+
+      const bookingResult = await bookingResponse.json()
+
+      // Process payment
+      const paymentResponse = await fetch("/api/payments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          bookingId: bookingResult.data.id,
+          amount: bookingDetails.totalPrice,
+          ...paymentDetails,
+        }),
+      })
+
+      if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json()
+        throw new Error(errorData.error || "Payment processing failed")
       }
 
       // Show success message

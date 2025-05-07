@@ -84,8 +84,19 @@ export default function UserDashboard() {
           const bookingsResponse = await fetch(`/api/bookings?userId=${user.uid}`)
           if (bookingsResponse.ok) {
             const bookingsData = await bookingsResponse.json()
+
+            if (bookingsData.success && Array.isArray(bookingsData.data)) {
+              setRecentBookings(bookingsData.data)
+            } else if (Array.isArray(bookingsData)) {
+
             setRecentBookings(bookingsData)
-          } else {
+          }
+          else {
+            console.error("Unexpected bookingsData response format:", bookingsData)
+            setRecentBookings([])
+          }
+        }
+          else {
             console.error("Failed to fetch bookings:", await bookingsResponse.text())
           }
         }

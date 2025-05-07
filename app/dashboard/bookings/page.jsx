@@ -14,26 +14,44 @@ export default function BookingsPage() {
   const { getBookings, loading } = useDatabase()
   const [bookings, setBookings] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-
+ 
   useEffect(() => {
     const fetchBookings = async () => {
       if (!user) return
-
+  
       try {
         setIsLoading(true)
-        const data = await getBookings({ userId: user.uid })
-        setBookings(data || [])
+        const bookingsResponse = await fetch(`/api/bookings?userId=${user.uid}`)
+          if (bookingsResponse.ok) {
+            const bookingsData = await bookingsResponse.json()
+
+            if (bookingsData.success && Array.isArray(bookingsData.data)) {
+              setBookings(bookingsData.data)
+            } else if (Array.isArray(bookingsData)) {
+
+              setBookings(bookingsData)
+          }
+          else {
+            console.error("Unexpected bookingsData response format:", bookingsData)
+            setBookings([])
+          }
+        }
+          else {
+            console.error("Failed to fetch bookings:", await bookingsResponse.text())
+          }
+       // setBookings(Array.isArray(data) ? data : Object.values(data));
       } catch (error) {
         console.error("Error fetching bookings:", error)
       } finally {
         setIsLoading(false)
       }
     }
-
+  
     if (user) {
       fetchBookings()
     }
   }, [user, getBookings])
+    
 
   // Filter bookings by status
   const upcomingBookings = bookings.filter((booking) => booking.status === "confirmed" || booking.status === "pending")

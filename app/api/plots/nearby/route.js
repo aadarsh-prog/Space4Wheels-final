@@ -29,9 +29,10 @@ export async function GET(request) {
 
     console.log(`Found ${result.data.length} plots within ${radius} miles`)
 
+    // Ensure we always return an array, even if empty
     return NextResponse.json({
       success: true,
-      data: result.data,
+      data: Array.isArray(result.data) ? result.data : [],
     })
   } catch (error) {
     console.error("Error fetching nearby plots:", error)
