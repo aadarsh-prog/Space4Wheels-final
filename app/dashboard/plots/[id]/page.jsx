@@ -20,6 +20,8 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Calendar,
+  CreditCard,
 } from "lucide-react"
 import { format } from "date-fns"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -60,14 +62,14 @@ function ImageGallery({ images }) {
         <>
           <button
             onClick={prevImage}
-            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full"
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
             aria-label="Previous image"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
           <button
             onClick={nextImage}
-            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full"
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
             aria-label="Next image"
           >
             <ChevronRight className="h-6 w-6" />
@@ -77,7 +79,7 @@ function ImageGallery({ images }) {
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`h-2 w-2 rounded-full ${index === currentIndex ? "bg-white" : "bg-white/50"}`}
+                className={`h-2 w-2 rounded-full transition-colors ${index === currentIndex ? "bg-white" : "bg-white/50"}`}
                 aria-label={`Go to image ${index + 1}`}
               />
             ))}
@@ -341,7 +343,9 @@ export default function PlotDetailPage() {
           </AlertDescription>
         </Alert>
         <div className="mt-4 flex justify-center">
-          <Button onClick={() => router.push("/dashboard/find")}>Find Another Spot</Button>
+          <Button onClick={() => router.push("/dashboard/find")} className="btn-hover-effect">
+            Find Another Spot
+          </Button>
         </div>
       </div>
     )
@@ -350,7 +354,11 @@ export default function PlotDetailPage() {
   return (
     <div className="container mx-auto py-8">
       <div className="mb-6">
-        <Button variant="ghost" className="mb-2" onClick={() => router.push("/dashboard/find")}>
+        <Button
+          variant="ghost"
+          className="mb-2 hover:bg-transparent hover:text-primary"
+          onClick={() => router.push("/dashboard/find")}
+        >
           &larr; Back to Search
         </Button>
         <h1 className="text-3xl font-bold">{plot.name}</h1>
@@ -369,7 +377,7 @@ export default function PlotDetailPage() {
       )}
 
       {bookingSuccess && (
-        <Alert className="mb-6 bg-green-50 border-green-200">
+        <Alert className="mb-6 bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
           <CheckCircle2 className="h-4 w-4 text-green-500" />
           <AlertTitle>Booking Successful!</AlertTitle>
           <AlertDescription>
@@ -380,13 +388,13 @@ export default function PlotDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card>
+          <Card className="overflow-hidden card-hover">
             <CardContent className="p-0">
               <ImageGallery images={plot.images || []} />
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="card-hover">
             <CardHeader>
               <CardTitle>Location Map</CardTitle>
             </CardHeader>
@@ -398,67 +406,82 @@ export default function PlotDetailPage() {
           </Card>
 
           <Tabs defaultValue="details">
-            <TabsList className="mb-4">
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="reviews">Reviews ({reviews.length})</TabsTrigger>
+            <TabsList className="mb-4 bg-muted/50 p-1">
+              <TabsTrigger value="details" className="text-base py-2 px-4">
+                Details
+              </TabsTrigger>
+              <TabsTrigger value="reviews" className="text-base py-2 px-4">
+                Reviews ({reviews.length})
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="details">
-              <Card>
+              <Card className="card-hover">
                 <CardHeader>
                   <CardTitle>Parking Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-start gap-2">
-                      <DollarSign className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="bg-primary/10 p-2 rounded-full">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                      </div>
                       <div>
                         <h3 className="font-medium">Price</h3>
-                        <p>${plot.price}/hour</p>
+                        <p className="text-lg font-semibold">${plot.price}/hour</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
-                      <Car className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="bg-primary/10 p-2 rounded-full">
+                        <Car className="h-5 w-5 text-primary" />
+                      </div>
                       <div>
                         <h3 className="font-medium">Availability</h3>
-                        <p>
-                          {plot.availableSlots}/{plot.totalSlots} spots available
+                        <p className="text-lg font-semibold">
+                          {plot.availableSlots}/{plot.totalSlots} spots
                         </p>
                       </div>
                     </div>
                     {plot.rating && (
                       <div className="flex items-start gap-2">
-                        <Star className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div className="bg-primary/10 p-2 rounded-full">
+                          <Star className="h-5 w-5 text-primary" />
+                        </div>
                         <div>
                           <h3 className="font-medium">Rating</h3>
-                          <p>
-                            {plot.rating.toFixed(1)}/5 ({plot.reviewCount} reviews)
+                          <p className="text-lg font-semibold">
+                            {plot.rating.toFixed(1)}/5{" "}
+                            <span className="text-sm font-normal text-muted-foreground">
+                              ({plot.reviewCount} reviews)
+                            </span>
                           </p>
                         </div>
                       </div>
                     )}
                     <div className="flex items-start gap-2">
-                      <Clock className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="bg-primary/10 p-2 rounded-full">
+                        <Clock className="h-5 w-5 text-primary" />
+                      </div>
                       <div>
                         <h3 className="font-medium">Hours</h3>
-                        <p>Open 24/7</p>
+                        <p className="text-lg font-semibold">Open 24/7</p>
                       </div>
                     </div>
                   </div>
 
                   {plot.description && (
-                    <div className="mt-4">
+                    <div className="mt-6 p-4 bg-muted/30 rounded-lg">
                       <h3 className="font-medium mb-2">Description</h3>
                       <p className="text-muted-foreground">{plot.description}</p>
                     </div>
                   )}
 
                   {plot.features && plot.features.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="font-medium mb-2">Features</h3>
-                      <ul className="grid grid-cols-2 gap-2">
+                    <div className="mt-6">
+                      <h3 className="font-medium mb-3">Features</h3>
+                      <ul className="grid grid-cols-2 gap-3">
                         {plot.features.map((feature, index) => (
-                          <li key={index} className="flex items-center gap-2">
+                          <li key={index} className="flex items-center gap-2 bg-muted/30 p-2 rounded-md">
                             <CheckCircle2 className="h-4 w-4 text-green-500" />
                             <span>{feature}</span>
                           </li>
@@ -471,7 +494,7 @@ export default function PlotDetailPage() {
             </TabsContent>
 
             <TabsContent value="reviews">
-              <Card>
+              <Card className="card-hover">
                 <CardHeader>
                   <CardTitle>Customer Reviews</CardTitle>
                   {plot.rating && (
@@ -482,9 +505,11 @@ export default function PlotDetailPage() {
                 </CardHeader>
                 <CardContent>
                   {reviews.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">
-                      No reviews yet. Be the first to leave a review!
-                    </p>
+                    <div className="text-center py-8 bg-muted/30 rounded-lg">
+                      <Star className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-lg mb-2">No reviews yet.</p>
+                      <p className="text-sm text-muted-foreground">Be the first to leave a review!</p>
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       {reviews.map((review) => (
@@ -520,12 +545,12 @@ export default function PlotDetailPage() {
 
         <div className="space-y-6">
           {bookingStep === 1 && (
-            <Card>
-              <CardHeader>
+            <Card className="card-hover animate-pulse-shadow">
+              <CardHeader className="bg-primary/5 border-b">
                 <CardTitle>Book This Spot</CardTitle>
                 <CardDescription>Select your parking date and time</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Date</label>
                   <CalendarComponent
@@ -533,7 +558,7 @@ export default function PlotDetailPage() {
                     selected={bookingDate}
                     onSelect={setBookingDate}
                     disabled={(date) => date < new Date()}
-                    className="rounded-md border"
+                    className="rounded-md border mx-auto"
                   />
                 </div>
 
@@ -569,7 +594,7 @@ export default function PlotDetailPage() {
                   </Select>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-2 mt-4 bg-muted/30 p-3 rounded-lg">
                   <div className="flex justify-between text-sm">
                     <span>Price per hour:</span>
                     <span className="font-medium">${plot.price}</span>
@@ -582,13 +607,13 @@ export default function PlotDetailPage() {
                   </div>
                   <div className="flex justify-between font-medium mt-2 pt-2 border-t">
                     <span>Total:</span>
-                    <span>${(plot.price * duration).toFixed(2)}</span>
+                    <span className="text-lg">${(plot.price * duration).toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>
               <CardFooter>
                 <Button
-                  className="w-full"
+                  className="w-full btn-hover-effect"
                   onClick={handleBookingSubmit}
                   disabled={processingBooking || plot.availableSlots < 1}
                 >
@@ -600,7 +625,10 @@ export default function PlotDetailPage() {
                   ) : plot.availableSlots < 1 ? (
                     "No Spots Available"
                   ) : (
-                    "Continue to Payment"
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Continue to Payment
+                    </>
                   )}
                 </Button>
               </CardFooter>
@@ -608,13 +636,13 @@ export default function PlotDetailPage() {
           )}
 
           {bookingStep === 2 && bookingDetails && (
-            <Card>
-              <CardHeader>
+            <Card className="card-hover animate-pulse-shadow">
+              <CardHeader className="bg-primary/5 border-b">
                 <CardTitle>Payment</CardTitle>
                 <CardDescription>Complete your booking by making a payment</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-muted p-3 rounded-md space-y-2">
+              <CardContent className="space-y-4 pt-6">
+                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
                   <h3 className="font-medium">Booking Summary</h3>
                   {plot.images && plot.images.length > 0 && (
                     <div className="mb-3">
@@ -625,30 +653,38 @@ export default function PlotDetailPage() {
                       />
                     </div>
                   )}
-                  <div className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Location:</span>
-                      <span>{bookingDetails.plotName}</span>
+                  <div className="text-sm space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <MapPin className="h-3 w-3" /> Location:
+                      </span>
+                      <span className="font-medium">{bookingDetails.plotName}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Date:</span>
-                      <span>{format(bookingDetails.startTime, "MMM d, yyyy")}</span>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Calendar className="h-3 w-3" /> Date:
+                      </span>
+                      <span className="font-medium">{format(bookingDetails.startTime, "MMM d, yyyy")}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Time:</span>
-                      <span>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3 w-3" /> Time:
+                      </span>
+                      <span className="font-medium">
                         {format(bookingDetails.startTime, "h:mm a")} - {format(bookingDetails.endTime, "h:mm a")}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Duration:</span>
-                      <span>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3 w-3" /> Duration:
+                      </span>
+                      <span className="font-medium">
                         {bookingDetails.duration} hour{bookingDetails.duration > 1 ? "s" : ""}
                       </span>
                     </div>
-                    <div className="flex justify-between font-medium pt-1 mt-1 border-t">
+                    <div className="flex justify-between font-medium pt-2 mt-1 border-t">
                       <span>Total:</span>
-                      <span>${bookingDetails.totalPrice.toFixed(2)}</span>
+                      <span className="text-lg">${bookingDetails.totalPrice.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -664,16 +700,16 @@ export default function PlotDetailPage() {
           )}
 
           {bookingStep === 3 && bookingSuccess && (
-            <Card>
-              <CardHeader className="text-center pb-3">
-                <div className="mx-auto bg-green-100 w-12 h-12 rounded-full flex items-center justify-center mb-2">
-                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+            <Card className="card-hover animate-pulse-shadow">
+              <CardHeader className="text-center pb-3 bg-green-50 dark:bg-green-900/20">
+                <div className="mx-auto bg-green-100 dark:bg-green-800/30 w-16 h-16 rounded-full flex items-center justify-center mb-3 animate-bounce-slight">
+                  <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
                 </div>
                 <CardTitle>Booking Confirmed!</CardTitle>
                 <CardDescription>Your parking spot has been successfully booked</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-muted p-3 rounded-md space-y-2">
+              <CardContent className="space-y-4 pt-6">
+                <div className="bg-muted/30 p-4 rounded-lg space-y-3">
                   <h3 className="font-medium">Booking Details</h3>
                   {plot.images && plot.images.length > 0 && (
                     <div className="mb-3">
@@ -684,30 +720,36 @@ export default function PlotDetailPage() {
                       />
                     </div>
                   )}
-                  <div className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Location:</span>
-                      <span>{bookingDetails.plotName}</span>
+                  <div className="text-sm space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <MapPin className="h-3 w-3" /> Location:
+                      </span>
+                      <span className="font-medium">{bookingDetails.plotName}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Date:</span>
-                      <span>{format(bookingDetails.startTime, "MMM d, yyyy")}</span>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Calendar className="h-3 w-3" /> Date:
+                      </span>
+                      <span className="font-medium">{format(bookingDetails.startTime, "MMM d, yyyy")}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Time:</span>
-                      <span>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3 w-3" /> Time:
+                      </span>
+                      <span className="font-medium">
                         {format(bookingDetails.startTime, "h:mm a")} - {format(bookingDetails.endTime, "h:mm a")}
                       </span>
                     </div>
                     <div className="flex justify-between font-medium pt-1 mt-1 border-t">
                       <span>Total Paid:</span>
-                      <span>${bookingDetails.totalPrice.toFixed(2)}</span>
+                      <span className="text-lg">${bookingDetails.totalPrice.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
 
-                <Alert>
-                  <Info className="h-4 w-4" />
+                <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+                  <Info className="h-4 w-4 text-blue-500" />
                   <AlertTitle>Important Information</AlertTitle>
                   <AlertDescription>
                     Please arrive on time. Your booking confirmation has been sent to your email.
@@ -715,24 +757,26 @@ export default function PlotDetailPage() {
                 </Alert>
               </CardContent>
               <CardFooter className="flex flex-col space-y-2">
-                <Button className="w-full" onClick={viewBookingDetails}>
+                <Button className="w-full btn-hover-effect" onClick={viewBookingDetails}>
                   View All Bookings
                 </Button>
-                <Button variant="outline" className="w-full" onClick={findAnotherSpot}>
+                <Button variant="outline" className="w-full btn-hover-effect" onClick={findAnotherSpot}>
                   Find Another Spot
                 </Button>
               </CardFooter>
             </Card>
           )}
 
-          <Card>
+          <Card className="card-hover">
             <CardHeader>
               <CardTitle>Location</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 <div className="flex items-start gap-2">
-                  <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="bg-primary/10 p-2 rounded-full">
+                    <MapPin className="h-5 w-5 text-primary" />
+                  </div>
                   <div>
                     <p className="font-medium">{plot.address}</p>
                     {plot.distance && (
@@ -747,7 +791,7 @@ export default function PlotDetailPage() {
           </Card>
 
           {plot.features && plot.features.includes("EV Charging") && (
-            <Card>
+            <Card className="card-hover">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">EV Charging Available</CardTitle>
               </CardHeader>

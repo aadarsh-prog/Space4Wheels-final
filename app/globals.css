@@ -2,16 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -83,12 +73,80 @@ body {
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
-
 @layer base {
   * {
-    /* @apply border-border; */
+    @apply border-border-color;
   }
   body {
-    /* @apply bg-background text-foreground; */
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom animations */
+@keyframes pulse-shadow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px 5px rgba(59, 130, 246, 0.3);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Custom utility classes */
+@layer components {
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-lg hover:border-primary/30 hover:-translate-y-1;
+  }
+
+  .card-interactive {
+    @apply card-hover cursor-pointer;
+  }
+
+  .btn-hover-effect {
+    @apply relative overflow-hidden transition-all duration-300;
+  }
+
+  .btn-hover-effect::after {
+    @apply content-[''] absolute top-0 h-full w-0 left-0 bg-white/20 transition-all duration-300 ease-out;
+  }
+
+  .btn-hover-effect:hover::after {
+    @apply w-full;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-pulse-shadow {
+    animation: pulse-shadow 2s infinite;
+  }
+
+  .glass-effect {
+    @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-md;
+  }
+
+  .section-title {
+    @apply text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6;
+  }
+
+  .gradient-border {
+    @apply relative rounded-lg p-[1px] bg-gradient-to-r from-blue-500 to-purple-500;
+  }
+
+  .gradient-border > * {
+    @apply rounded-[calc(0.5rem-1px)];
   }
 }
