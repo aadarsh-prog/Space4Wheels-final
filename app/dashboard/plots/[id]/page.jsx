@@ -8,12 +8,85 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MapComponent } from "@/components/map-component"
 import { useToast } from "@/components/ui/use-toast"
 import { useAuth } from "@/lib/firebase/auth-context"
-import { Clock, MapPin, Star, DollarSign, Car, Loader2, Info, AlertCircle, CheckCircle2 } from "lucide-react"
+import {
+  Clock,
+  MapPin,
+  Star,
+  DollarSign,
+  Car,
+  Loader2,
+  Info,
+  AlertCircle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react"
 import { format } from "date-fns"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { PaymentForm } from "@/components/payment/payment-form"
+
+// Add this new component after the imports and before the generateTimeSlots function
+function ImageGallery({ images }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  // If no images are provided, show a placeholder
+  if (!images || images.length === 0) {
+    return (
+      <div className="h-[300px] w-full bg-muted flex items-center justify-center rounded-t-md">
+        <Car className="h-16 w-16 text-muted-foreground opacity-30" />
+      </div>
+    )
+  }
+
+  const nextImage = () => {
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length)
+  }
+
+  const prevImage = () => {
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length)
+  }
+
+  return (
+    <div className="relative h-[300px] w-full">
+      <img
+        src={images[currentIndex] || "/placeholder.svg"}
+        alt={`Parking spot image ${currentIndex + 1}`}
+        className="h-full w-full object-cover rounded-t-md"
+      />
+
+      {images.length > 1 && (
+        <>
+          <button
+            onClick={prevImage}
+            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full"
+            aria-label="Previous image"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+          <button
+            onClick={nextImage}
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-1 rounded-full"
+            aria-label="Next image"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+            {images.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentIndex(index)}
+                className={`h-2 w-2 rounded-full ${index === currentIndex ? "bg-white" : "bg-white/50"}`}
+                aria-label={`Go to image ${index + 1}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 // Generate time slots from 6 AM to 10 PM
 const generateTimeSlots = () => {
@@ -309,7 +382,16 @@ export default function PlotDetailPage() {
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardContent className="p-0">
-              <div className="h-[300px] w-full rounded-t-md overflow-hidden">
+              <ImageGallery images={plot.images || []} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Location Map</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="h-[300px] w-full rounded-b-md overflow-hidden">
                 <MapComponent plots={[plot]} selectedPlotId={plot.id} userLocation={null} />
               </div>
             </CardContent>
@@ -534,6 +616,15 @@ export default function PlotDetailPage() {
               <CardContent className="space-y-4">
                 <div className="bg-muted p-3 rounded-md space-y-2">
                   <h3 className="font-medium">Booking Summary</h3>
+                  {plot.images && plot.images.length > 0 && (
+                    <div className="mb-3">
+                      <img
+                        src={plot.images[0] || "/placeholder.svg"}
+                        alt="Parking spot"
+                        className="w-full h-32 object-cover rounded-md"
+                      />
+                    </div>
+                  )}
                   <div className="text-sm space-y-1">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Location:</span>
@@ -584,6 +675,15 @@ export default function PlotDetailPage() {
               <CardContent className="space-y-4">
                 <div className="bg-muted p-3 rounded-md space-y-2">
                   <h3 className="font-medium">Booking Details</h3>
+                  {plot.images && plot.images.length > 0 && (
+                    <div className="mb-3">
+                      <img
+                        src={plot.images[0] || "/placeholder.svg"}
+                        alt="Parking spot"
+                        className="w-full h-32 object-cover rounded-md"
+                      />
+                    </div>
+                  )}
                   <div className="text-sm space-y-1">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Location:</span>
