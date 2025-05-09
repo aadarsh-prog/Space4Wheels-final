@@ -201,8 +201,8 @@ export default function FindParkingPage() {
         } else {
           // Use a geocoding service here
           // For now, we'll use a mock location (New York City)
-          searchLat = 40.7128
-          searchLng = -74.006
+          searchLat = 22.719568
+          searchLng =  75.857727
           toast({
             title: "Using approximate location",
             description: "For demo purposes, we're using New York City as the search location.",
