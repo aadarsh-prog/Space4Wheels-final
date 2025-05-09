@@ -171,7 +171,7 @@ export default function ProfilePage() {
                       <FormItem>
                         <FormLabel>Phone Number</FormLabel>
                         <FormControl>
-                          <Input placeholder="+1 (555) 123-4567" {...field} />
+                          <Input placeholder="+91 xxxx-nnnnnn" {...field} />
                         </FormControl>
                         <FormDescription>Add your phone number for booking notifications.</FormDescription>
                         <FormMessage />
@@ -207,12 +207,12 @@ export default function ProfilePage() {
                 <CardContent className="space-y-4">
                   <FormField
                     control={passwordForm.control}
-                    name="currentPassword"
+                    name="Current Password"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Current Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder="********" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -220,12 +220,12 @@ export default function ProfilePage() {
                   />
                   <FormField
                     control={passwordForm.control}
-                    name="newPassword"
+                    name="New Password"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>New Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder="********" {...field} />
                         </FormControl>
                         <FormDescription>Password must be at least 6 characters.</FormDescription>
                         <FormMessage />
@@ -234,12 +234,12 @@ export default function ProfilePage() {
                   />
                   <FormField
                     control={passwordForm.control}
-                    name="confirmPassword"
+                    name="Confirm Password"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Confirm New Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••••" {...field} />
+                          <Input type="password" placeholder="********" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -247,14 +247,14 @@ export default function ProfilePage() {
                   />
                 </CardContent>
                 <CardFooter>
-                  <Button type="submit" disabled={isChangingPassword}>
+                  <Button type="Submit" disabled={isChangingPassword}>
                     {isChangingPassword ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Changing Password...
                       </>
                     ) : (
-                      "Change Password"
+                      "Password changed"
                     )}
                   </Button>
                 </CardFooter>
