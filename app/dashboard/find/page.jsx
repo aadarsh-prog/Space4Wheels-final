@@ -367,8 +367,8 @@ export default function FindParkingPage() {
                   <div className="space-y-2">
                     <h3 className="text-sm font-medium">Search Radius</h3>
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">{searchRadius} miles</span>
-                      <span className="text-sm text-muted-foreground">Max: {MAX_SEARCH_RADIUS} miles</span>
+                      <span className="text-sm text-muted-foreground">{searchRadius} Kilometers</span>
+                      <span className="text-sm text-muted-foreground">Max: {MAX_SEARCH_RADIUS} Kilometers</span>
                     </div>
                     <Slider
                       value={[searchRadius]}
@@ -404,7 +404,7 @@ export default function FindParkingPage() {
                       onValueChange={(value) => setMinAvailability(value[0])}
                     />
                     <div className="text-sm text-muted-foreground">
-                      At least {minAvailability} spot{minAvailability > 1 ? "s" : ""} available
+                      At least {minAvailability} spot{minAvailability > 1 ? "₹" : ""} available
                     </div>
                   </div>
 
@@ -449,7 +449,7 @@ export default function FindParkingPage() {
           <Alert>
             <Zap className="h-4 w-4" />
             <AlertTitle>Expanding Search</AlertTitle>
-            <AlertDescription>Searching within {currentSearchRadius} miles of your location...</AlertDescription>
+            <AlertDescription>Searching within {currentSearchRadius} Kilometers of your location...</AlertDescription>
           </Alert>
         )}
 
@@ -468,7 +468,7 @@ export default function FindParkingPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm font-medium">Search Radius</span>
-                    <span className="text-sm text-muted-foreground">{searchRadius} miles</span>
+                    <span className="text-sm text-muted-foreground">{searchRadius} Kilometers</span>
                   </div>
                   <Slider
                     value={[searchRadius]}
