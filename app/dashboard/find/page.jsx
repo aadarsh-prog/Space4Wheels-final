@@ -1,5 +1,36 @@
 "use client"
 
+function navigateToLocation(destination) {
+  if (!navigator.geolocation) {
+    alert("Geolocation not supported");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const userLat = position.coords.latitude;
+      const userLng = position.coords.longitude;
+
+      const destLat = destination.lat || destination.latitude;
+      const destLng = destination.lng || destination.longitude;
+
+      if (!destLat || !destLng) {
+        alert("Destination coordinates not available");
+        return;
+      }
+
+      const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${destLat},${destLng}&travelmode=driving`;
+      window.open(mapsUrl, '_blank');
+    },
+    (error) => {
+      console.error("Geolocation error:", error);
+      alert("Could not get your location");
+    },
+    { enableHighAccuracy: true }
+  );
+}
+
+
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -89,7 +120,7 @@ export default function FindParkingPage() {
     async (lat, lng, radius) => {
       try {
         setIsSearching(true)
-        setSearchStatus(`Searching for parking within ${radius} miles...`)
+        setSearchStatus(`Searching for parking within ${radius} Kilometers...`)
         setSearchProgress(30)
 
         // API call to get nearby plots
@@ -109,7 +140,7 @@ export default function FindParkingPage() {
         const plotsData = Array.isArray(data.data) ? data.data : []
 
         if (data.success && plotsData.length > 0) {
-          console.log(`Found ${plotsData.length} plots within ${radius} miles`, plotsData)
+          console.log(`Found ${plotsData.length} plots within ${radius} Kilometers`, plotsData)
           // Sort plots by distance
           const sortedPlots = sortPlots(plotsData, sortBy)
           setPlots(sortedPlots)
@@ -117,10 +148,10 @@ export default function FindParkingPage() {
           setSearchStatus(`Found ${plotsData.length} parking spots near you!`)
           return true // Results found
         } else {
-          console.log(`No plots found within ${radius} miles`)
+          console.log(`No plots found within ${radius} Kilometers`)
           setPlots([])
           setFilteredPlots([])
-          setSearchStatus(`No parking spots found within ${radius} miles.`)
+          setSearchStatus(`No parking spots found within ${radius} Kilometers.`)
           return false // No results
         }
       } catch (error) {
@@ -147,7 +178,7 @@ export default function FindParkingPage() {
 
     while (!resultsFound && radius <= MAX_SEARCH_RADIUS) {
       setCurrentSearchRadius(radius)
-      setSearchStatus(`Expanding search to ${radius} miles...`)
+      setSearchStatus(`Expanding search to ${radius} Kilometers...`)
 
       resultsFound = await fetchNearbyPlots(userLocation.lat, userLocation.lng, radius)
 
@@ -157,16 +188,16 @@ export default function FindParkingPage() {
     }
 
     if (!resultsFound) {
-      setSearchStatus(`No parking spots found within ${MAX_SEARCH_RADIUS} miles.`)
+      setSearchStatus(`No parking spots found within ${MAX_SEARCH_RADIUS} Kilometers.`)
       toast({
         title: "No Results Found",
-        description: `We couldn't find any parking spots within ${MAX_SEARCH_RADIUS} miles of your location.`,
+        description: `We couldn't find any parking spots within ${MAX_SEARCH_RADIUS} Kilometers of your location.`,
         variant: "destructive",
       })
     } else {
       toast({
         title: "Parking Spots Found!",
-        description: `We found parking spots within ${radius} miles of your location.`,
+        description: `We found parking spots within ${radius} Kilometers of your location.`,
       })
     }
 
@@ -223,7 +254,7 @@ export default function FindParkingPage() {
       if (!resultsFound) {
         toast({
           title: "No Results Found",
-          description: `No parking spots found within ${searchRadius} miles. Would you like to expand your search?`,
+          description: `No parking spots found within ${searchRadius} Kilometers. Would you like to expand your search?`,
           action: (
             <Button variant="outline" onClick={expandSearchRadius}>
               Expand Search
@@ -367,8 +398,8 @@ export default function FindParkingPage() {
                   <div className="space-y-2">
                     <h3 className="text-sm font-medium">Search Radius</h3>
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">{searchRadius} miles</span>
-                      <span className="text-sm text-muted-foreground">Max: {MAX_SEARCH_RADIUS} miles</span>
+                      <span className="text-sm text-muted-foreground">{searchRadius} Kilometers</span>
+                      <span className="text-sm text-muted-foreground">Max: {MAX_SEARCH_RADIUS} Kilometers</span>
                     </div>
                     <Slider
                       value={[searchRadius]}
@@ -382,8 +413,8 @@ export default function FindParkingPage() {
                   <div className="space-y-2">
                     <h3 className="text-sm font-medium">Maximum Price</h3>
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">${maxPrice}/hour</span>
-                      <span className="text-sm text-muted-foreground">Max: $30/hour</span>
+                      <span className="text-sm text-muted-foreground">₹{maxPrice}/hour</span>
+                      <span className="text-sm text-muted-foreground">Max: ₹30/hour</span>
                     </div>
                     <Slider
                       value={[maxPrice]}
@@ -449,7 +480,7 @@ export default function FindParkingPage() {
           <Alert>
             <Zap className="h-4 w-4" />
             <AlertTitle>Expanding Search</AlertTitle>
-            <AlertDescription>Searching within {currentSearchRadius} miles of your location...</AlertDescription>
+            <AlertDescription>Searching within {currentSearchRadius} Kilometers of your location...</AlertDescription>
           </Alert>
         )}
 
@@ -468,7 +499,7 @@ export default function FindParkingPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm font-medium">Search Radius</span>
-                    <span className="text-sm text-muted-foreground">{searchRadius} miles</span>
+                    <span className="text-sm text-muted-foreground">{searchRadius} Kilometers</span>
                   </div>
                   <Slider
                     value={[searchRadius]}
@@ -482,7 +513,7 @@ export default function FindParkingPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-sm font-medium">Max Price</span>
-                    <span className="text-sm text-muted-foreground">${maxPrice}/hour</span>
+                    <span className="text-sm text-muted-foreground">₹ {maxPrice}/hour</span>
                   </div>
                   <Slider
                     value={[maxPrice]}
@@ -562,11 +593,11 @@ export default function FindParkingPage() {
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="flex items-center gap-1">
                               <DollarSign className="h-3 w-3 text-muted-foreground" />
-                              <span className="font-medium">${plot.price}/hour</span>
+                              <span className="font-medium">₹{plot.price}/hour</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <MapPin className="h-3 w-3 text-muted-foreground" />
-                              <span className="font-medium">{plot.distance.toFixed(1)} miles</span>
+                              <span className="font-medium">{plot.distance.toFixed(1)} Kilometers</span>
                             </div>
                             <div className="col-span-2 flex items-center gap-1">
                               <Clock className="h-3 w-3 text-muted-foreground" />
@@ -582,7 +613,17 @@ export default function FindParkingPage() {
                               Book Now
                             </Button>
                           </Link>
-                        </CardFooter>
+                        
+  <Button
+    variant="outline"
+    size="sm"
+    className="w-full"
+    onClick={() => navigateToLocation(plot.location)}
+  >
+    Navigate
+  </Button>
+
+</CardFooter>
                       </Card>
                     ))
                   )}
@@ -651,7 +692,7 @@ export default function FindParkingPage() {
                             <div className="grid gap-2">
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Price:</span>
-                                <span className="font-medium">${plot.price}/hour</span>
+                                <span className="font-medium">₹{plot.price}/hour</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Available:</span>
@@ -661,7 +702,7 @@ export default function FindParkingPage() {
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Distance:</span>
-                                <span className="font-medium">{plot.distance.toFixed(1)} miles</span>
+                                <span className="font-medium">{plot.distance.toFixed(1)} Kilometers</span>
                               </div>
                               {plot.features && plot.features.length > 0 && (
                                 <Accordion type="single" collapsible className="mt-2">
@@ -686,7 +727,17 @@ export default function FindParkingPage() {
                             <Link href={`/dashboard/plots/${plot.id}`} className="w-full">
                               <Button className="w-full">Book Now</Button>
                             </Link>
-                          </CardFooter>
+                          
+  <Button
+    variant="outline"
+    size="sm"
+    className="w-full"
+    onClick={() => plot.location && navigateToLocation(plot.location)}
+  >
+    Navigate
+  </Button>
+
+</CardFooter>
                         </Card>
                       ))
                     )}

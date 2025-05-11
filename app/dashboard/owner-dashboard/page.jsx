@@ -159,7 +159,7 @@ export default function OwnerDashboard() {
             <CardContent className="pt-6">
               <div className="flex flex-col items-center justify-center space-y-2">
                 <CreditCard className="h-10 w-10 text-green-500" />
-                <h2 className="text-3xl font-bold">${stats.totalRevenue.toFixed(2)}</h2>
+                <h2 className="text-3xl font-bold">₹{stats.totalRevenue.toFixed(2)}</h2>
                 <p className="text-sm text-muted-foreground">Total Revenue</p>
               </div>
             </CardContent>
@@ -193,7 +193,7 @@ export default function OwnerDashboard() {
                     <div className="grid gap-2">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Price:</span>
-                        <span className="font-medium">${plot.price}/hour</span>
+                        <span className="font-medium">₹{plot.price}/hour</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Available:</span>
@@ -252,7 +252,7 @@ export default function OwnerDashboard() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium">${booking.amount?.toFixed(2) || "0.00"}</p>
+                        <p className="font-medium">₹{booking.amount?.toFixed(2) || "0.00"}</p>
                         <p
                           className={`text-sm ${
                             booking.status === "confirmed"

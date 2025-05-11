@@ -428,7 +428,7 @@ export default function PlotDetailPage() {
                       </div>
                       <div>
                         <h3 className="font-medium">Price</h3>
-                        <p className="text-lg font-semibold">${plot.price}/hour</p>
+                        <p className="text-lg font-semibold">₹{plot.price}/hour</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-2">
@@ -597,7 +597,7 @@ export default function PlotDetailPage() {
                 <div className="pt-2 mt-4 bg-muted/30 p-3 rounded-lg">
                   <div className="flex justify-between text-sm">
                     <span>Price per hour:</span>
-                    <span className="font-medium">${plot.price}</span>
+                    <span className="font-medium">₹{plot.price}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Duration:</span>
@@ -607,7 +607,7 @@ export default function PlotDetailPage() {
                   </div>
                   <div className="flex justify-between font-medium mt-2 pt-2 border-t">
                     <span>Total:</span>
-                    <span className="text-lg">${(plot.price * duration).toFixed(2)}</span>
+                    <span className="text-lg">₹{(plot.price * duration).toFixed(2)}</span>
                   </div>
                 </div>
               </CardContent>
@@ -684,7 +684,7 @@ export default function PlotDetailPage() {
                     </div>
                     <div className="flex justify-between font-medium pt-2 mt-1 border-t">
                       <span>Total:</span>
-                      <span className="text-lg">${bookingDetails.totalPrice.toFixed(2)}</span>
+                      <span className="text-lg">₹{bookingDetails.totalPrice.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -743,7 +743,7 @@ export default function PlotDetailPage() {
                     </div>
                     <div className="flex justify-between font-medium pt-1 mt-1 border-t">
                       <span>Total Paid:</span>
-                      <span className="text-lg">${bookingDetails.totalPrice.toFixed(2)}</span>
+                      <span className="text-lg">₹{bookingDetails.totalPrice.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -781,7 +781,7 @@ export default function PlotDetailPage() {
                     <p className="font-medium">{plot.address}</p>
                     {plot.distance && (
                       <p className="text-sm text-muted-foreground">
-                        {plot.distance.toFixed(1)} miles from your location
+                        {plot.distance.toFixed(1)} Kilometers from your location
                       </p>
                     )}
                   </div>
@@ -799,6 +799,7 @@ export default function PlotDetailPage() {
                 <p className="text-sm text-muted-foreground">
                   This parking location offers electric vehicle charging stations. Additional fees may apply.
                 </p>
+                <h3> this is for sample</h3>
               </CardContent>
             </Card>
           )}
