@@ -54,6 +54,7 @@ export default function FindParkingPage() {
   const [currentSearchRadius, setCurrentSearchRadius] = useState(INITIAL_SEARCH_RADIUS)
   const [showFilters, setShowFilters] = useState(false)
   const [searchError, setSearchError] = useState(null)
+ // const [selectedPlot, setSelectedPlot] = useState(null)
 
   // Get user's location on component mount
   useEffect(() => {
@@ -89,7 +90,7 @@ export default function FindParkingPage() {
     async (lat, lng, radius) => {
       try {
         setIsSearching(true)
-        setSearchStatus(`Searching for parking within ${radius} miles...`)
+        setSearchStatus(`Searching for parking within ${radius} Kilometers...`)
         setSearchProgress(30)
 
         // API call to get nearby plots
@@ -109,7 +110,7 @@ export default function FindParkingPage() {
         const plotsData = Array.isArray(data.data) ? data.data : []
 
         if (data.success && plotsData.length > 0) {
-          console.log(`Found ${plotsData.length} plots within ${radius} miles`, plotsData)
+          console.log(`Found ${plotsData.length} plots within ${radius} Kilometers`, plotsData)
           // Sort plots by distance
           const sortedPlots = sortPlots(plotsData, sortBy)
           setPlots(sortedPlots)
@@ -117,10 +118,10 @@ export default function FindParkingPage() {
           setSearchStatus(`Found ${plotsData.length} parking spots near you!`)
           return true // Results found
         } else {
-          console.log(`No plots found within ${radius} miles`)
+          console.log(`No plots found within ${radius} Kilometers`)
           setPlots([])
           setFilteredPlots([])
-          setSearchStatus(`No parking spots found within ${radius} miles.`)
+          setSearchStatus(`No parking spots found within ${radius} Kilometers.`)
           return false // No results
         }
       } catch (error) {
@@ -147,7 +148,7 @@ export default function FindParkingPage() {
 
     while (!resultsFound && radius <= MAX_SEARCH_RADIUS) {
       setCurrentSearchRadius(radius)
-      setSearchStatus(`Expanding search to ${radius} miles...`)
+      setSearchStatus(`Expanding search to ${radius} Kilometers...`)
 
       resultsFound = await fetchNearbyPlots(userLocation.lat, userLocation.lng, radius)
 
@@ -157,16 +158,16 @@ export default function FindParkingPage() {
     }
 
     if (!resultsFound) {
-      setSearchStatus(`No parking spots found within ${MAX_SEARCH_RADIUS} miles.`)
+      setSearchStatus(`No parking spots found within ${MAX_SEARCH_RADIUS} Kilometers.`)
       toast({
         title: "No Results Found",
-        description: `We couldn't find any parking spots within ${MAX_SEARCH_RADIUS} miles of your location.`,
+        description: `We couldn't find any parking spots within ${MAX_SEARCH_RADIUS} Kilometers of your location.`,
         variant: "destructive",
       })
     } else {
       toast({
         title: "Parking Spots Found!",
-        description: `We found parking spots within ${radius} miles of your location.`,
+        description: `We found parking spots within ${radius} Kilometers of your location.`,
       })
     }
 
@@ -223,7 +224,7 @@ export default function FindParkingPage() {
       if (!resultsFound) {
         toast({
           title: "No Results Found",
-          description: `No parking spots found within ${searchRadius} miles. Would you like to expand your search?`,
+          description: `No parking spots found within ${searchRadius} Kilometers. Would you like to expand your search?`,
           action: (
             <Button variant="outline" onClick={expandSearchRadius}>
               Expand Search
@@ -566,7 +567,7 @@ export default function FindParkingPage() {
                             </div>
                             <div className="flex items-center gap-1">
                               <MapPin className="h-3 w-3 text-muted-foreground" />
-                              <span className="font-medium">{plot.distance.toFixed(1)} miles</span>
+                              <span className="font-medium">{plot.distance.toFixed(1)} Kilometers</span>
                             </div>
                             <div className="col-span-2 flex items-center gap-1">
                               <Clock className="h-3 w-3 text-muted-foreground" />
@@ -661,7 +662,7 @@ export default function FindParkingPage() {
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-muted-foreground">Distance:</span>
-                                <span className="font-medium">{plot.distance.toFixed(1)} miles</span>
+                                <span className="font-medium">{plot.distance.toFixed(1)} Kilometers</span>
                               </div>
                               {plot.features && plot.features.length > 0 && (
                                 <Accordion type="single" collapsible className="mt-2">

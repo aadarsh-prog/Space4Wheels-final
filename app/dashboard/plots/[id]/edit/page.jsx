@@ -76,6 +76,7 @@ export default function EditPlotPage() {
       description: "",
       price: 0,
       totalSlots: 0,
+      
     },
   })
 
@@ -320,7 +321,7 @@ export default function EditPlotPage() {
                     name="price"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Price per Hour ($)</FormLabel>
+                        <FormLabel>Price per Hour (₹)</FormLabel>
                         <FormControl>
                           <Input type="number" min="0" step="0.5" {...field} />
                         </FormControl>
