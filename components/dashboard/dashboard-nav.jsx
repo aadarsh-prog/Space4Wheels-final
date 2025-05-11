@@ -51,7 +51,7 @@ export function DashboardNav({ userRole }) {
             <SheetContent side="left">
               <div className="flex items-center gap-2 pb-4 pt-2">
                 <Car className="h-6 w-6 text-primary" />
-                <span className="text-lg font-bold">ParkEase</span>
+                <span className="text-lg font-bold">Space4wheels</span>
               </div>
               <nav className="grid gap-2 py-4">
                 {navItems.map((item) => (
@@ -72,7 +72,7 @@ export function DashboardNav({ userRole }) {
           </Sheet>
           <Link href="/dashboard" className="flex items-center gap-2">
             <Car className="h-6 w-6 text-primary" />
-            <span className="text-lg font-bold hidden md:inline-block">ParkEase</span>
+            <span className="text-lg font-bold hidden md:inline-block">Space4Wheels</span>
           </Link>
         </div>
 
