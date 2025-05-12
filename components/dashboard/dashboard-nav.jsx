@@ -22,17 +22,54 @@ export function DashboardNav({ userRole }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const userNavItems = [
-    { title: "Dashboard", href: "/dashboard", icon: <Home className="h-5 w-5" /> },
-    { title: "Find Parking", href: "/dashboard/find", icon: <Map className="h-5 w-5" /> },
-    { title: "My Bookings", href: "/dashboard/bookings", icon: <Calendar className="h-5 w-5" /> },
-    { title: "Profile", href: "/dashboard/profile", icon: <User className="h-5 w-5" /> },
+    {
+      title: "Dashboard",
+      href: "/dashboard",
+      icon: <Home className="h-5 w-5" />,
+    },
+    {
+      title: "Find Parking",
+      href: "/dashboard/find",
+      icon: <Map className="h-5 w-5" />,
+    },
+    {
+      title: "My Bookings",
+      href: "/dashboard/bookings",
+      icon: <Calendar className="h-5 w-5" />,
+    },
+    {
+      title: "My Vehicles",
+      href: "/dashboard/vehicles",
+      icon: <Car className="h-5 w-5" />,
+    },
+    {
+      title: "Profile",
+      href: "/dashboard/profile",
+      icon: <User className="h-5 w-5" />,
+    },
   ]
 
   const ownerNavItems = [
-    { title: "Dashboard", href: "/dashboard/owner-dashboard", icon: <Home className="h-5 w-5" /> },
-    { title: "My Plots", href: "/dashboard/plots", icon: <LayoutGrid className="h-5 w-5" /> },
-    { title: "Add Plot", href: "/dashboard/plots/add", icon: <Plus className="h-5 w-5" /> },
-    { title: "Profile", href: "/dashboard/profile", icon: <User className="h-5 w-5" /> },
+    {
+      title: "Dashboard",
+      href: "/dashboard/owner-dashboard",
+      icon: <Home className="h-5 w-5" />,
+    },
+    {
+      title: "My Plots",
+      href: "/dashboard/plots",
+      icon: <LayoutGrid className="h-5 w-5" />,
+    },
+    {
+      title: "Add Plot",
+      href: "/dashboard/plots/add",
+      icon: <Plus className="h-5 w-5" />,
+    },
+    {
+      title: "Profile",
+      href: "/dashboard/profile",
+      icon: <User className="h-5 w-5" />,
+    },
   ]
 
   const navItems = userRole === "owner" ? ownerNavItems : userNavItems
@@ -51,12 +88,12 @@ export function DashboardNav({ userRole }) {
             <SheetContent side="left">
               <div className="flex items-center gap-2 pb-4 pt-2">
                 <Car className="h-6 w-6 text-primary" />
-                <span className="text-lg font-bold">Space4wheels</span>
+                <span className="text-lg font-bold">Space4Wheels</span>
               </div>
               <nav className="grid gap-2 py-4">
-                {navItems.map((item) => (
+                {navItems.map((item, index) => (
                   <Link
-                    key={item.href}
+                    key={index}
                     href={item.href}
                     onClick={() => setIsOpen(false)}
                     className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
@@ -75,16 +112,13 @@ export function DashboardNav({ userRole }) {
             <span className="text-lg font-bold hidden md:inline-block">Space4Wheels</span>
           </Link>
         </div>
-
         <nav className="hidden md:flex items-center gap-6">
-          {navItems.map((item) => (
+          {navItems.map((item, index) => (
             <Link
-              key={item.href}
+              key={index}
               href={item.href}
               className={`flex items-center gap-2 text-sm font-medium ${
-                pathname === item.href
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                pathname === item.href ? "text-primary" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {item.icon}
@@ -92,7 +126,6 @@ export function DashboardNav({ userRole }) {
             </Link>
           ))}
         </nav>
-
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

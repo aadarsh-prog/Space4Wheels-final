@@ -28,6 +28,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { PaymentForm } from "@/components/payment/payment-form"
+import { VehicleSelector } from "@/components/vehicles/vehicle-selector"
 
 // Add this new component after the imports and before the generateTimeSlots function
 function ImageGallery({ images }) {
@@ -124,6 +125,7 @@ export default function PlotDetailPage() {
   const [processingBooking, setProcessingBooking] = useState(false)
   const [bookingError, setBookingError] = useState(null)
   const [bookingSuccess, setBookingSuccess] = useState(false)
+  const [selectedVehicle, setSelectedVehicle] = useState(null)
 
   // Fetch plot details and reviews
   useEffect(() => {
@@ -216,6 +218,18 @@ export default function PlotDetailPage() {
       totalPrice,
       userId: user?.uid,
       userName: user?.displayName || user?.email,
+      vehicle: selectedVehicle
+        ? {
+            id: selectedVehicle.id,
+            nickname: selectedVehicle.nickname,
+            type: selectedVehicle.type,
+            brand: selectedVehicle.brand,
+            model: selectedVehicle.model,
+            registrationNumber: selectedVehicle.registrationNumber,
+            color: selectedVehicle.color,
+            fuelType: selectedVehicle.fuelType,
+          }
+        : null,
     }
   }
 
@@ -228,6 +242,15 @@ export default function PlotDetailPage() {
         variant: "destructive",
       })
       router.push("/auth/login")
+      return
+    }
+
+    if (!selectedVehicle) {
+      toast({
+        title: "Vehicle Required",
+        description: "Please select or add a vehicle to continue",
+        variant: "destructive",
+      })
       return
     }
 
@@ -594,6 +617,11 @@ export default function PlotDetailPage() {
                   </Select>
                 </div>
 
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Vehicle</label>
+                  <VehicleSelector onVehicleSelect={setSelectedVehicle} selectedVehicleId={selectedVehicle?.id} />
+                </div>
+
                 <div className="pt-2 mt-4 bg-muted/30 p-3 rounded-lg">
                   <div className="flex justify-between text-sm">
                     <span>Price per hour:</span>
@@ -615,7 +643,7 @@ export default function PlotDetailPage() {
                 <Button
                   className="w-full btn-hover-effect"
                   onClick={handleBookingSubmit}
-                  disabled={processingBooking || plot.availableSlots < 1}
+                  disabled={processingBooking || plot.availableSlots < 1 || !selectedVehicle}
                 >
                   {processingBooking ? (
                     <>
@@ -624,6 +652,8 @@ export default function PlotDetailPage() {
                     </>
                   ) : plot.availableSlots < 1 ? (
                     "No Spots Available"
+                  ) : !selectedVehicle ? (
+                    "Please Select a Vehicle"
                   ) : (
                     <>
                       <CreditCard className="mr-2 h-4 w-4" />
@@ -680,6 +710,15 @@ export default function PlotDetailPage() {
                       </span>
                       <span className="font-medium">
                         {bookingDetails.duration} hour{bookingDetails.duration > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Car className="h-3 w-3" /> Vehicle:
+                      </span>
+                      <span className="font-medium">
+                        {bookingDetails.vehicle.nickname ||
+                          `${bookingDetails.vehicle.brand} ${bookingDetails.vehicle.model}`}
                       </span>
                     </div>
                     <div className="flex justify-between font-medium pt-2 mt-1 border-t">
@@ -739,6 +778,16 @@ export default function PlotDetailPage() {
                       </span>
                       <span className="font-medium">
                         {format(bookingDetails.startTime, "h:mm a")} - {format(bookingDetails.endTime, "h:mm a")}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1 text-muted-foreground">
+                        <Car className="h-3 w-3" /> Vehicle:
+                      </span>
+                      <span className="font-medium">
+                        {bookingDetails.vehicle.nickname ||
+                          `${bookingDetails.vehicle.brand} ${bookingDetails.vehicle.model}`}{" "}
+                        ({bookingDetails.vehicle.registrationNumber})
                       </span>
                     </div>
                     <div className="flex justify-between font-medium pt-1 mt-1 border-t">

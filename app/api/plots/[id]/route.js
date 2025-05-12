@@ -3,7 +3,8 @@ import { getPlotById } from "@/lib/firebase/admin-database/plots"
 
 export async function GET(request, { params }) {
   try {
-    const plotId = params.id
+    const resolveparams=await params;
+    const plotId = resolveparams.id
 
     if (!plotId) {
       return NextResponse.json({ success: false, error: "Plot ID is required", data: null }, { status: 400 })
