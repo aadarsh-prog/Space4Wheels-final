@@ -799,7 +799,7 @@ export default function PlotDetailPage() {
                 <p className="text-sm text-muted-foreground">
                   This parking location offers electric vehicle charging stations. Additional fees may apply.
                 </p>
-                <h3> this is for sample</h3>
+                
               </CardContent>
             </Card>
           )}

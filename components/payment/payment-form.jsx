@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,7 +14,13 @@ export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) 
   const [cvv, setCvv] = useState("")
   const [errors, setErrors] = useState({})
 
-  // Format card number with spaces
+  useEffect(() => {
+    const script = document.createElement("script")
+    script.src = "https://checkout.razorpay.com/v1/checkout.js"
+    script.async = true
+    document.body.appendChild(script)
+  }, [])
+
   const formatCardNumber = (value) => {
     const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "")
     const matches = v.match(/\d{4,16}/g)
@@ -25,25 +31,14 @@ export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) 
       parts.push(match.substring(i, i + 4))
     }
 
-    if (parts.length) {
-      return parts.join(" ")
-    } else {
-      return value
-    }
+    return parts.length ? parts.join(" ") : value
   }
 
-  // Format expiry date
   const formatExpiryDate = (value) => {
     const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "")
-
-    if (v.length >= 2) {
-      return `${v.substring(0, 2)}/${v.substring(2, 4)}`
-    }
-
-    return v
+    return v.length >= 2 ? `${v.substring(0, 2)}/${v.substring(2, 4)}` : v
   }
 
-  // Validate form
   const validateForm = () => {
     const newErrors = {}
 
@@ -73,18 +68,44 @@ export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) 
     return Object.keys(newErrors).length === 0
   }
 
-  // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (!validateForm()) return
 
-    if (validateForm()) {
-      onSubmit({
-        cardNumber: cardNumber.replace(/\s+/g, ""),
-        cardName,
-        expiryDate,
-        cvv,
-      })
+    const options = {
+     key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,// Razorpay Key ID
+      amount: amount * 100, // amount in paise
+      currency: "INR",
+      name: "Vehicle Parking App",
+      description: "Slot Booking Payment",
+      handler: function (response) {
+        // Success callback
+        onSubmit({
+          razorpay_payment_id: response.razorpay_payment_id,
+          cardName,
+          cardNumber: cardNumber.replace(/\s+/g, ""),
+          expiryDate,
+          cvv,
+        })
+      },
+      prefill: {
+        name: cardName,
+        email: "test@example.com",
+        contact: "9999999999",
+      },
+      method: {
+    upi: true,         // ✅ Enable UPI
+    card: true,        // Optional, you can disable others
+    netbanking: true,
+  },
+
+      theme: {
+        color: "#0f172a",
+      },
     }
+
+    const rzp = new window.Razorpay(options)
+    rzp.open()
   }
 
   return (
@@ -152,23 +173,9 @@ export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) 
           <AccordionContent>
             <div className="space-y-2 pt-2">
               <Button variant="outline" className="w-full justify-start" type="button" disabled>
-                <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
-                    fill="#FFD700"
-                    stroke="#FFD700"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
                 Pay with PayPal
               </Button>
               <Button variant="outline" className="w-full justify-start" type="button" disabled>
-                <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="2" />
-                  <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="2" />
-                </svg>
                 Apple Pay
               </Button>
               <p className="text-xs text-muted-foreground text-center mt-2">Additional payment methods coming soon</p>
@@ -194,8 +201,7 @@ export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) 
       </div>
 
       <div className="text-xs text-center text-muted-foreground">
-        <p>This is a demo application. No actual payment will be processed.</p>
-        <p>You can use any card details for testing.</p>
+        <p>Payment is powered by Razorpay. Use test card details if enabled in test mode.</p>
       </div>
     </form>
   )
