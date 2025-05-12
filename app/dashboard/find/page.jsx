@@ -200,7 +200,7 @@ export default function FindParkingPage() {
           searchLng = coordinates.lng
         } else {
           // Use a geocoding service here
-          // For now, we'll use a mock location (New York City)
+          
           searchLat = 22.719568
           searchLng =  75.857727
           toast({

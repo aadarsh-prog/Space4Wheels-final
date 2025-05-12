@@ -66,70 +66,9 @@ export default function AdminDashboard() {
     }
   }, [user, router])
 
-  // For demo purposes, let's create some dummy stats
-  const dummyStats = {
-    totalUsers: 156,
-    totalOwners: 42,
-    totalPlots: 78,
-    pendingPlots: 12,
-    totalBookings: 324,
-    totalRevenue: 4850,
-  }
-
-  const dummyPendingPlots = [
-    {
-      id: "plot1",
-      name: "Downtown Parking",
-      address: "123 Main St, Downtown",
-      ownerId: "owner1",
-      ownerName: "John Smith",
-      createdAt: "2023-05-10T10:30:00Z",
-    },
-    {
-      id: "plot2",
-      name: "Central Mall Parking",
-      address: "456 Market Ave, Central",
-      ownerId: "owner2",
-      ownerName: "Jane Doe",
-      createdAt: "2023-05-09T14:20:00Z",
-    },
-  ]
-
-  const dummyRecentUsers = [
-    { id: "user1", name: "John Doe", email: "john@example.com", role: "user", createdAt: "2023-05-10T10:30:00Z" },
-    { id: "user2", name: "Jane Smith", email: "jane@example.com", role: "owner", createdAt: "2023-05-09T14:20:00Z" },
-    { id: "user3", name: "Mike Johnson", email: "mike@example.com", role: "user", createdAt: "2023-05-08T09:15:00Z" },
-  ]
-
-  const dummyRecentBookings = [
-    {
-      id: "booking1",
-      userId: "user1",
-      plotId: "plot1",
-      plotName: "Downtown Parking",
-      date: "2023-05-15",
-      amount: 15,
-      status: "confirmed",
-    },
-    {
-      id: "booking2",
-      userId: "user3",
-      plotId: "plot2",
-      plotName: "Central Mall Parking",
-      date: "2023-05-14",
-      amount: 22,
-      status: "confirmed",
-    },
-    {
-      id: "booking3",
-      userId: "user2",
-      plotId: "plot3",
-      plotName: "City Center Parking",
-      date: "2023-05-13",
-      amount: 18,
-      status: "cancelled",
-    },
-  ]
+  
+  
+  
 
   if (loading) {
     return (
@@ -150,11 +89,11 @@ export default function AdminDashboard() {
     )
   }
 
-  // Use dummy data for now
-  const displayStats = stats || dummyStats
-  const displayPendingPlots = pendingPlots.length > 0 ? pendingPlots : dummyPendingPlots
-  const displayRecentUsers = recentUsers.length > 0 ? recentUsers : dummyRecentUsers
-  const displayRecentBookings = recentBookings.length > 0 ? recentBookings : dummyRecentBookings
+ 
+  const displayStats = stats
+  const displayPendingPlots = pendingPlots
+  const displayRecentUsers = recentUsers
+  const displayRecentBookings = recentBookings
 
   return (
     <div className="container mx-auto">

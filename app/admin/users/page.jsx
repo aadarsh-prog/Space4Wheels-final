@@ -50,7 +50,7 @@ export default function AdminUsersPage() {
     // Redirect if not an admin
     if (user && user.role !== "admin") {
       if (user.role === "owner") {
-        router.push("/owner")
+        router.push("/dashboard/owner-dashboard")
       } else {
         router.push("/dashboard")
       }
@@ -183,51 +183,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  // For demo purposes, let's create some dummy users
-  const dummyUsers = [
-    {
-      id: "user1",
-      name: "John Doe",
-      email: "john@example.com",
-      role: "user",
-      createdAt: "2023-05-10T10:30:00Z",
-      bookings: 5,
-    },
-    {
-      id: "user2",
-      name: "Jane Smith",
-      email: "jane@example.com",
-      role: "owner",
-      createdAt: "2023-05-09T14:20:00Z",
-      plots: 3,
-    },
-    {
-      id: "user3",
-      name: "Mike Johnson",
-      email: "mike@example.com",
-      role: "user",
-      createdAt: "2023-05-08T09:15:00Z",
-      bookings: 2,
-    },
-    {
-      id: "user4",
-      name: "Sarah Williams",
-      email: "sarah@example.com",
-      role: "admin",
-      createdAt: "2023-05-07T11:45:00Z",
-    },
-    {
-      id: "user5",
-      name: "David Brown",
-      email: "david@example.com",
-      role: "owner",
-      createdAt: "2023-05-06T16:30:00Z",
-      plots: 1,
-    },
-  ]
-
-  // Use dummy data if no real data is available
-  const displayUsers = filteredUsers.length > 0 ? filteredUsers : dummyUsers
+  const displayUsers = filteredUsers;
 
   if (isLoading) {
     return (

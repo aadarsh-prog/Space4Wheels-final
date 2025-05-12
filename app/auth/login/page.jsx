@@ -35,7 +35,7 @@ export default function LoginPage() {
     try {
       setIsLoading(true)
       await signIn(values.email, values.password)
-      router.push("/dashboard")
+      //router.push("/dashboard")
     } catch (error) {
       console.error("Login error:", error)
       setIsLoading(false)
