@@ -185,7 +185,7 @@ export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) 
               Processing...
             </>
           ) : (
-            `Pay $${amount.toFixed(2)}`
+            `Pay ₹${amount.toFixed(2)}`
           )}
         </Button>
         <Button type="button" variant="outline" onClick={onCancel} disabled={processing}>

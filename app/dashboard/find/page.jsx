@@ -618,7 +618,15 @@ export default function FindParkingPage() {
     variant="outline"
     size="sm"
     className="w-full"
-    onClick={() => navigateToLocation(plot.location)}
+  onClick={() => {
+  if (plot.lat && plot.lng) {
+  navigateToLocation({ lat: plot.lat, lng: plot.lng });
+} else {
+  alert("Plot coordinates are missing");
+}
+}}
+
+
   >
     Navigate
   </Button>

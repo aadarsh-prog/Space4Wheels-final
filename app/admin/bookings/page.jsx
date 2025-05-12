@@ -285,7 +285,7 @@ export default function AdminBookingsPage() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <CreditCard className="h-4 w-4 text-muted-foreground" />
-                      <span>${booking.amount}</span>
+                      <span>₹{booking.amount}</span>
                     </div>
                   </TableCell>
                   <TableCell>
