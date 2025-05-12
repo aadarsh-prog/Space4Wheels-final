@@ -12,7 +12,7 @@ import { Loader2 } from "lucide-react"
 
 const vehicleSchema = z.object({
   nickname: z.string().optional(),
-  type: z.enum(["Car", "Bike", "Van", "Truck", "EV"]),
+  type: z.enum(["Car", "Bike", "Van", "Truck", "EV" , "Tractor" , "Auto"]),
   brand: z.string().min(1, "Brand is required"),
   model: z.string().min(1, "Model is required"),
   registrationNumber: z.string().min(1, "Registration number is required"),
@@ -27,12 +27,12 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isSubmitting }) {
     resolver: zodResolver(vehicleSchema),
     defaultValues: {
       nickname: vehicle?.nickname || "",
-      type: vehicle?.type || "Car",
+      type: vehicle?.type || "",
       brand: vehicle?.brand || "",
       model: vehicle?.model || "",
       registrationNumber: vehicle?.registrationNumber || "",
       color: vehicle?.color || "",
-      fuelType: vehicle?.fuelType || "Petrol",
+      fuelType: vehicle?.fuelType || "",
     },
   })
 
@@ -86,6 +86,8 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isSubmitting }) {
                     <SelectItem value="Van">Van</SelectItem>
                     <SelectItem value="Truck">Truck</SelectItem>
                     <SelectItem value="EV">EV</SelectItem>
+                    <SelectItem value="Tractor">Tractor</SelectItem>
+                    <SelectItem value="Auto">Auto Rickshaw</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

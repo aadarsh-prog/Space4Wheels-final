@@ -32,7 +32,7 @@ export default function UserDashboard() {
     // Redirect if not a regular user
     if (user && user.role !== "user") {
       if (user.role === "owner") {
-        router.push("/owner")
+        router.push("dashboard/owner-dashboard")
       } else if (user.role === "admin") {
         router.push("/admin")
       }
@@ -156,6 +156,10 @@ export default function UserDashboard() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <h1 className="text-3xl font-bold">Welcome, {user?.displayName || "User"}</h1>
         <div className="mt-4 md:mt-0 flex gap-3">
+          <Button className="btn-hover-effect" onClick={() => router.push("/dashboard/vehicles")}>
+            <Car className="h-5 w-5" />
+            My Vehicles
+          </Button>
           <Button className="btn-hover-effect" onClick={() => router.push("/dashboard/find")}>
             <Search className="mr-2 h-4 w-4" />
             Find Parking
