@@ -248,7 +248,7 @@ export default function UserDashboard() {
                           </div>
                         )}
                         <div className="absolute top-2 right-2 bg-primary text-white text-sm font-medium px-2 py-1 rounded">
-                          ${plot.price}/hr
+                          ₹{plot.price}/hr
                         </div>
                       </div>
                       <CardHeader className="pb-2">
@@ -268,7 +268,7 @@ export default function UserDashboard() {
                           </div>
                           <div className="flex items-center">
                             <Navigation className="h-4 w-4 text-muted-foreground mr-1" />
-                            <span>{plot.distance?.toFixed(1) || "N/A"} miles</span>
+                            <span>{plot.distance?.toFixed(1) || "N/A"} Kilometers</span>
                           </div>
                         </div>
                       </CardContent>

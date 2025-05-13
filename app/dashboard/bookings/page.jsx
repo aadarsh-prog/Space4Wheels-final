@@ -115,7 +115,7 @@ export default function BookingsPage() {
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex justify-between">
                           <span className="font-medium">Total Paid:</span>
-                          <span className="font-bold">${booking.price}</span>
+                          <span className="font-bold">₹{booking.price}</span>
                         </div>
                       </div>
                     </div>
@@ -171,7 +171,7 @@ export default function BookingsPage() {
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex justify-between">
                           <span className="font-medium">Total Paid:</span>
-                          <span className="font-bold">${booking.price}</span>
+                          <span className="font-bold">₹{booking.price}</span>
                         </div>
                       </div>
                     </div>
