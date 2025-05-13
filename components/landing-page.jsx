@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/firebase/auth-context";
 import { Car, MapPin, Clock, CreditCard } from "lucide-react";
+import LogoHeader from "components/LogoHeader";
 
 export function LandingPage() {
   const { user, loading } = useAuth();
@@ -137,10 +138,10 @@ export function LandingPage() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <Car className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">ParkEase</span>
+              <span className="text-xl font-bold">Space4Wheels</span>
             </div>
             <div className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} ParkEase. All rights reserved.
+              © {new Date().getFullYear()} Space4Wheels. All rights reserved.
             </div>
           </div>
         </div>

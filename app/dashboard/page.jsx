@@ -31,8 +31,8 @@ export default function UserDashboard() {
 
     // Redirect if not a regular user
     if (user && user.role !== "user") {
-      if (user.role === "owner") {
-        router.push("/dashboard/owner-dashboard")
+      if (user.role === "owner") { 
+        router.push("dashboard/owner-dashboard")
       } else if (user.role === "admin") {
         router.push("/admin")
       }
