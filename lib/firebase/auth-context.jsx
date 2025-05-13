@@ -8,6 +8,8 @@ import {
   updateProfile,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
 } from "firebase/auth"
 import { useFirebase } from "./firebase-provider"
 
@@ -67,6 +69,7 @@ export function AuthProvider({ children }) {
                   uid: firebaseUser.uid,
                   email: firebaseUser.email,
                   displayName: firebaseUser.displayName,
+                  emailVerified: firebaseUser.emailVerified,
                   role: "user", // Default role
                 })
               } else {
@@ -79,6 +82,7 @@ export function AuthProvider({ children }) {
                   uid: firebaseUser.uid,
                   email: firebaseUser.email,
                   displayName: firebaseUser.displayName,
+                  emailVerified: firebaseUser.emailVerified,
                   role: userData.role || "user",
                   profile: userData,
                 })
@@ -91,6 +95,7 @@ export function AuthProvider({ children }) {
                 uid: firebaseUser.uid,
                 email: firebaseUser.email,
                 displayName: firebaseUser.displayName,
+                emailVerified: firebaseUser.emailVerified,
                 role: "user", // Default role
               })
             }
@@ -124,6 +129,19 @@ export function AuthProvider({ children }) {
       setLoading(true)
       // Use the imported signInWithEmailAndPassword function
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
+
+      // Check if email is verified
+      if (!userCredential.user.emailVerified) {
+        // Sign out the user if email is not verified
+        await firebaseSignOut(auth)
+        return {
+          success: false,
+          error: "Please verify your email before logging in.",
+          emailVerificationNeeded: true,
+          email: email,
+        }
+      }
+
       const idToken = await userCredential.user.getIdToken()
 
       // Create session cookie on the server
@@ -144,7 +162,7 @@ export function AuthProvider({ children }) {
 
       if (!userDoc.ok) {
         // Default to user dashboard if can't fetch role
-        router.push("/dashboard")
+        router.push("/auth/login")
         return { success: true }
       }
 
@@ -155,20 +173,20 @@ export function AuthProvider({ children }) {
         router.push("/admin")
       } else if (userData.role === "owner") {
         router.push("/dashboard/owner-dashboard")
-      } else if(userData.role === "user"){
+      } else {
         router.push("/dashboard")
       }
 
       return { success: true }
     } catch (error) {
       console.error("Error signing in:", error)
-      return { success: false, error: error.message }
+      return { success: false, error: "Incorrect email or password." }
     } finally {
       setLoading(false)
     }
   }
 
-  const signUp = async (email, password, name, role = "user") => {
+  const signUp = async (email, password, name,role ) => {
     if (!auth) {
       console.error("Firebase auth not initialized")
       return { success: false, error: "Authentication service not available" }
@@ -182,6 +200,9 @@ export function AuthProvider({ children }) {
 
       // Update display name using the imported updateProfile function
       await updateProfile(user, { displayName: name })
+
+      // Send verification email
+      await sendEmailVerification(user)
 
       // Get the ID token
       const idToken = await user.getIdToken(true)
@@ -205,11 +226,14 @@ export function AuthProvider({ children }) {
         throw new Error("Failed to create user profile")
       }
 
-      
-      // Redirect to login
-      router.push("/auth/login")
+      // Sign out the user after registration to force email verification
+      await firebaseSignOut(auth)
 
-      return { success: true }
+      return {
+        success: true,
+        emailVerificationSent: true,
+        email: email,
+      }
     } catch (error) {
       console.error("Error signing up:", error)
       return { success: false, error: error.message }
@@ -236,12 +260,69 @@ export function AuthProvider({ children }) {
       await firebaseSignOut(auth)
 
       // Redirect to home page
-      router.push("/auth/login")
+      router.push("/components/landing-page")
 
       return { success: true }
     } catch (error) {
       console.error("Error signing out:", error)
       return { success: false, error: error.message }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resendVerificationEmail = async (email, password) => {
+    if (!auth) {
+      console.error("Firebase auth not initialized")
+      return { success: false, error: "Authentication service not available" }
+    }
+
+    try {
+      setLoading(true)
+
+      // Sign in to get the user object
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+
+      // Send verification email
+      await sendEmailVerification(userCredential.user)
+
+      // Sign out the user
+      await firebaseSignOut(auth)
+
+      return {
+        success: true,
+        message: "Verification email sent successfully.",
+      }
+    } catch (error) {
+      console.error("Error resending verification email:", error)
+      return {
+        success: false,
+        error: "Failed to resend verification email. Please check your credentials.",
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resetPassword = async (email) => {
+    if (!auth) {
+      console.error("Firebase auth not initialized")
+      return { success: false, error: "Authentication service not available" }
+    }
+
+    try {
+      setLoading(true)
+      await sendPasswordResetEmail(auth, email)
+      return {
+        success: true,
+        message: "Password reset email sent successfully.",
+      }
+    } catch (error) {
+      console.error("Error sending password reset email:", error)
+      return {
+        success: false,
+        error: "Failed to send password reset email. Please check your email address.",
+      }
     } finally {
       setLoading(false)
     }
@@ -253,6 +334,8 @@ export function AuthProvider({ children }) {
     signIn,
     signUp,
     signOut,
+    resendVerificationEmail,
+    resetPassword,
     isInitialized,
   }
 
