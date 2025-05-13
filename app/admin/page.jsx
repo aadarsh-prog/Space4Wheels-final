@@ -132,7 +132,7 @@ export default function AdminDashboard() {
             <CardContent className="pt-6">
               <div className="flex flex-col items-center justify-center space-y-2">
                 <CreditCard className="h-10 w-10 text-green-500" />
-                <h2 className="text-3xl font-bold">${displayStats.totalRevenue}</h2>
+                <h2 className="text-3xl font-bold">₹{displayStats.totalRevenue}</h2>
                 <p className="text-sm text-muted-foreground">Total Revenue</p>
               </div>
             </CardContent>
@@ -214,7 +214,7 @@ export default function AdminDashboard() {
                           <p className="text-sm text-muted-foreground">{booking.date}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm">${booking.amount}</p>
+                          <p className="text-sm">₹{booking.amount}</p>
                           <p
                             className={`text-xs ${booking.status === "confirmed" ? "text-green-500" : "text-red-500"}`}
                           >

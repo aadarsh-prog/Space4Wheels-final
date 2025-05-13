@@ -344,7 +344,7 @@ export default function PlotApprovalsPage() {
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
                               <span className="text-muted-foreground">Price: </span>
-                              <span className="font-medium">${plot.price}/hour</span>
+                              <span className="font-medium">₹{plot.price}/hour</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Total Slots: </span>
@@ -476,7 +476,7 @@ export default function PlotApprovalsPage() {
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
                               <span className="text-muted-foreground">Price: </span>
-                              <span className="font-medium">${plot.price}/hour</span>
+                              <span className="font-medium">₹{plot.price}/hour</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Total Slots: </span>
@@ -559,7 +559,7 @@ export default function PlotApprovalsPage() {
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
                               <span className="text-muted-foreground">Price: </span>
-                              <span className="font-medium">${plot.price}/hour</span>
+                              <span className="font-medium">₹{plot.price}/hour</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Total Slots: </span>

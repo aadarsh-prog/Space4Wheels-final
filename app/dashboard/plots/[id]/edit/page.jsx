@@ -76,6 +76,7 @@ export default function EditPlotPage() {
       description: "",
       price: 0,
       totalSlots: 0,
+      
     },
   })
 

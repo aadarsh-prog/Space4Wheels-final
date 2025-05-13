@@ -85,6 +85,7 @@ export default function FindParkingPage() {
   const [currentSearchRadius, setCurrentSearchRadius] = useState(INITIAL_SEARCH_RADIUS)
   const [showFilters, setShowFilters] = useState(false)
   const [searchError, setSearchError] = useState(null)
+ // const [selectedPlot, setSelectedPlot] = useState(null)
 
   // Get user's location on component mount
   useEffect(() => {
@@ -435,7 +436,7 @@ export default function FindParkingPage() {
                       onValueChange={(value) => setMinAvailability(value[0])}
                     />
                     <div className="text-sm text-muted-foreground">
-                      At least {minAvailability} spot{minAvailability > 1 ? "s" : ""} available
+                      At least {minAvailability} spot{minAvailability > 1 ? "₹" : ""} available
                     </div>
                   </div>
 
@@ -618,7 +619,15 @@ export default function FindParkingPage() {
     variant="outline"
     size="sm"
     className="w-full"
-    onClick={() => navigateToLocation(plot.location)}
+  onClick={() => {
+  if (plot.lat && plot.lng) {
+  navigateToLocation({ lat: plot.lat, lng: plot.lng });
+} else {
+  alert("Plot coordinates are missing");
+}
+}}
+
+
   >
     Navigate
   </Button>

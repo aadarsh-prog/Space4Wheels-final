@@ -91,6 +91,141 @@ function ImageGallery({ images }) {
   )
 }
 
+function navigateToLocation(destination) {
+  return new Promise((resolve, reject) => {
+    // Check if code is running on client-side
+    if (typeof window === 'undefined') {
+      reject(new Error('Navigation can only be used in client-side code'));
+      return;
+    }
+
+    // Check if geolocation is available in the browser
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by your browser'));
+      return;
+    }
+
+    // Get user's current position
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude: userLat, longitude: userLng } = position.coords;
+        
+        // Format destination coordinates
+        const destLat = destination.lat || destination.latitude;
+        const destLng = destination.lng || destination.longitude;
+        
+        // Check if coordinates are valid
+        if (!destLat || !destLng) {
+          reject(new Error('Destination coordinates are not available'));
+          return;
+        }
+        
+        // Open Google Maps for navigation
+        const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${userLat},${userLng}&destination=${destLat},${destLng}&travelmode=driving`;
+        
+        // Open in new tab
+        window.open(mapsUrl, '_blank');
+        resolve();
+      },
+      (error) => {
+        console.error("Error getting current location:", error);
+        
+        // Fallback: Try to navigate just to the destination
+        const destLat = destination.lat || destination.latitude;
+        const destLng = destination.lng || destination.longitude;
+        
+        if (destLat && destLng) {
+          const fallbackUrl = `https://www.google.com/maps/search/?api=1&query=${destLat},${destLng}`;
+          window.open(fallbackUrl, '_blank');
+          resolve();
+        } else {
+          reject(error);
+        }
+      },
+      { enableHighAccuracy: true }
+    );
+  });
+}
+
+// React component for navigation
+function ParkingSpotNavigator({ plot, toast }) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+
+  // Get user's location when component mounts
+  useEffect(() => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          });
+        },
+        (error) => {
+          console.error("Error getting current location:", error);
+          if (toast) {
+            toast({
+              title: "Location Access Limited",
+              description: "Unable to access your location. You'll still be able to navigate, but may need to confirm your starting point.",
+              variant: "warning",
+            });
+          }
+        }
+      );
+    }
+  }, [toast]);
+
+  // Handle navigation to parking spot
+  const handleNavigate = async () => {
+    if (!plot || !plot.location) {
+      if (toast) {
+        toast({
+          title: "Navigation Error",
+          description: "Parking location coordinates are not available.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      await navigateToLocation(plot.location);
+      
+      if (toast) {
+        toast({
+          title: "Navigation Started",
+          description: "Google Maps is opening with directions to your parking spot.",
+        });
+      }
+    } catch (error) {
+      console.error("Navigation failed:", error);
+      if (toast) {
+        toast({
+          title: "Navigation Failed",
+          description: error.message || "Unable to start navigation. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <button 
+      onClick={handleNavigate}
+      disabled={isLoading}
+      className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-blue-400 w-full md:w-auto"
+    >
+      {/* {isLoading ? <Spinner /> : <MapPin size={16} />} */}
+      <span>{isLoading ? "Starting Navigation..." : "Navigate to Spot"}</span>
+    </button>
+  );
+}
+
 // Generate time slots from 6 AM to 10 PM
 const generateTimeSlots = () => {
   const slots = []
@@ -848,7 +983,7 @@ export default function PlotDetailPage() {
                 <p className="text-sm text-muted-foreground">
                   This parking location offers electric vehicle charging stations. Additional fees may apply.
                 </p>
-                <h3> this is for sample</h3>
+                
               </CardContent>
             </Card>
           )}

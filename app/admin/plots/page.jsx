@@ -245,7 +245,7 @@ export default function AdminPlotsPage() {
                     </div>
                   </TableCell>
                   <TableCell>{plot.ownerName}</TableCell>
-                  <TableCell>${plot.price}/hr</TableCell>
+                  <TableCell>₹{plot.price}/hr</TableCell>
                   <TableCell>
                     {plot.availableSlots}/{plot.totalSlots}
                   </TableCell>
