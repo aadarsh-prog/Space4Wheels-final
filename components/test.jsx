@@ -119,7 +119,7 @@ export function DatabaseServiceExample() {
         return (
           <>
             <p>{item.address}</p>
-            <p className="mt-2">Price: ${item.price}/hour</p>
+            <p className="mt-2">Price: ₹{item.price}/hour</p>
             <p>
               Available: {item.availableSlots}/{item.totalSlots} slots
             </p>

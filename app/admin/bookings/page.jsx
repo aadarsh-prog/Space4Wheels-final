@@ -106,82 +106,8 @@ export default function AdminBookingsPage() {
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
   }
 
-  // For demo purposes, let's create some dummy bookings
-  const dummyBookings = [
-    {
-      id: "booking1",
-      userId: "user1",
-      userName: "John Doe",
-      plotId: "plot1",
-      plotName: "Downtown Parking",
-      startTime: "2023-05-15T10:00:00Z",
-      endTime: "2023-05-15T12:00:00Z",
-      duration: 2,
-      amount: 15,
-      status: "completed",
-      paymentStatus: "paid",
-      createdAt: "2023-05-14T09:30:00Z",
-    },
-    {
-      id: "booking2",
-      userId: "user2",
-      userName: "Jane Smith",
-      plotId: "plot2",
-      plotName: "Central Mall Parking",
-      startTime: "2023-05-16T14:00:00Z",
-      endTime: "2023-05-16T16:00:00Z",
-      duration: 2,
-      amount: 22,
-      status: "confirmed",
-      paymentStatus: "paid",
-      createdAt: "2023-05-15T13:20:00Z",
-    },
-    {
-      id: "booking3",
-      userId: "user3",
-      userName: "Mike Johnson",
-      plotId: "plot3",
-      plotName: "City Center Parking",
-      startTime: "2023-05-17T09:00:00Z",
-      endTime: "2023-05-17T11:00:00Z",
-      duration: 2,
-      amount: 18,
-      status: "cancelled",
-      paymentStatus: "refunded",
-      createdAt: "2023-05-16T08:15:00Z",
-    },
-    {
-      id: "booking4",
-      userId: "user1",
-      userName: "John Doe",
-      plotId: "plot4",
-      plotName: "Riverside Parking",
-      startTime: "2023-05-18T12:00:00Z",
-      endTime: "2023-05-18T15:00:00Z",
-      duration: 3,
-      amount: 12,
-      status: "pending",
-      paymentStatus: "pending",
-      createdAt: "2023-05-17T11:45:00Z",
-    },
-    {
-      id: "booking5",
-      userId: "user4",
-      userName: "Sarah Williams",
-      plotId: "plot5",
-      plotName: "Stadium Parking",
-      startTime: "2023-05-19T18:00:00Z",
-      endTime: "2023-05-19T22:00:00Z",
-      duration: 4,
-      amount: 32,
-      status: "confirmed",
-      paymentStatus: "paid",
-      createdAt: "2023-05-18T16:30:00Z",
-    },
-  ]
-
-  // Use dummy data if no real data is available
-  const displayBookings = filteredBookings.length > 0 ? filteredBookings : dummyBookings
+  
+  const displayBookings = filteredBookings
 
   if (isLoading) {
     return (
@@ -285,7 +211,7 @@ export default function AdminBookingsPage() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <CreditCard className="h-4 w-4 text-muted-foreground" />
-                      <span>${booking.amount}</span>
+                      <span>₹{booking.amount}</span>
                     </div>
                   </TableCell>
                   <TableCell>

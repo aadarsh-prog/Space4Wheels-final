@@ -373,7 +373,7 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="minimumPayout">Minimum Payout Amount ($)</Label>
+                  <Label htmlFor="minimumPayout">Minimum Payout Amount (₹)</Label>
                   <Input
                     id="minimumPayout"
                     name="minimumPayout"

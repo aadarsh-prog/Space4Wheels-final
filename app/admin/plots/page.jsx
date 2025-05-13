@@ -34,7 +34,7 @@ export default function AdminPlotsPage() {
     // Redirect if not an admin
     if (user && user.role !== "admin") {
       if (user.role === "owner") {
-        router.push("/owner")
+        router.push("/dashboard/owner-dashboard")
       } else {
         router.push("/dashboard")
       }
@@ -161,83 +161,9 @@ export default function AdminPlotsPage() {
     }
   }
 
-  // For demo purposes, let's create some dummy plots
-  const dummyPlots = [
-    {
-      id: "plot1",
-      name: "Downtown Parking",
-      address: "123 Main St, Downtown",
-      ownerId: "owner1",
-      ownerName: "John Smith",
-      price: 5,
-      totalSlots: 15,
-      availableSlots: 8,
-      rating: 4.5,
-      reviewCount: 12,
-      approvalStatus: "approved",
-      createdAt: "2023-05-10T10:30:00Z",
-    },
-    {
-      id: "plot2",
-      name: "Central Mall Parking",
-      address: "456 Market Ave, Central",
-      ownerId: "owner2",
-      ownerName: "Jane Doe",
-      price: 7,
-      totalSlots: 30,
-      availableSlots: 15,
-      rating: 4.2,
-      reviewCount: 8,
-      approvalStatus: "pending",
-      createdAt: "2023-05-09T14:20:00Z",
-    },
-    {
-      id: "plot3",
-      name: "City Center Parking",
-      address: "789 Center Blvd, Midtown",
-      ownerId: "owner3",
-      ownerName: "Mike Johnson",
-      price: 6,
-      totalSlots: 20,
-      availableSlots: 5,
-      rating: 3.8,
-      reviewCount: 5,
-      approvalStatus: "rejected",
-      rejectionReason: "Insufficient documentation",
-      createdAt: "2023-05-08T09:15:00Z",
-    },
-    {
-      id: "plot4",
-      name: "Riverside Parking",
-      address: "321 River Rd, Eastside",
-      ownerId: "owner1",
-      ownerName: "John Smith",
-      price: 4,
-      totalSlots: 25,
-      availableSlots: 20,
-      rating: 4.0,
-      reviewCount: 3,
-      approvalStatus: "approved",
-      createdAt: "2023-05-07T11:45:00Z",
-    },
-    {
-      id: "plot5",
-      name: "Stadium Parking",
-      address: "555 Sports Ave, Westside",
-      ownerId: "owner4",
-      ownerName: "Sarah Williams",
-      price: 8,
-      totalSlots: 50,
-      availableSlots: 22,
-      rating: 4.7,
-      reviewCount: 15,
-      approvalStatus: "pending",
-      createdAt: "2023-05-06T16:30:00Z",
-    },
-  ]
-
-  // Use dummy data if no real data is available
-  const displayPlots = filteredPlots.length > 0 ? filteredPlots : dummyPlots
+  
+ 
+  const displayPlots = filteredPlots;
 
   if (isLoading) {
     return (
@@ -319,7 +245,7 @@ export default function AdminPlotsPage() {
                     </div>
                   </TableCell>
                   <TableCell>{plot.ownerName}</TableCell>
-                  <TableCell>${plot.price}/hr</TableCell>
+                  <TableCell>₹{plot.price}/hr</TableCell>
                   <TableCell>
                     {plot.availableSlots}/{plot.totalSlots}
                   </TableCell>

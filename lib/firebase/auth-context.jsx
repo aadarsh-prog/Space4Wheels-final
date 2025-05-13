@@ -155,7 +155,7 @@ export function AuthProvider({ children }) {
         router.push("/admin")
       } else if (userData.role === "owner") {
         router.push("/dashboard/owner-dashboard")
-      } else {
+      } else if(userData.role === "user"){
         router.push("/dashboard")
       }
 
