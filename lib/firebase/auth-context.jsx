@@ -205,19 +205,7 @@ export function AuthProvider({ children }) {
         throw new Error("Failed to create user profile")
       }
 
-      // Create session cookie on the server
-      // const sessionResponse = await fetch("/api/auth/login", {
-      //   method: "POST",
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //   },
-      //   body: JSON.stringify({ idToken }),
-      // })
-
-      // if (!sessionResponse.ok) {
-      //   throw new Error("Failed to create session")
-      // }
-
+      
       // Redirect to login
       router.push("/auth/login")
 
