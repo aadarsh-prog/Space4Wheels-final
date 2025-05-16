@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getPlotById } from "@/lib/firebase/admin-database/plots"
+import {updatePlot } from "@/lib/firebase/admin-database/plots"
 
 export async function GET(request, { params }) {
   try {
@@ -26,5 +27,36 @@ export async function GET(request, { params }) {
   } catch (error) {
     console.error("Error fetching plot:", error)
     return NextResponse.json({ success: false, error: "Failed to fetch plot details", data: null }, { status: 500 })
+  }
+}
+
+
+// update plot data
+export async function PUT(request ,{ params }) {
+  try {
+    // Initialize Firebase Admin
+   const resolveparams=await params;
+    const plotId = resolveparams.id
+
+
+    const data = await request.json()
+    //console.log("Received plot data:", data)
+
+    // Validate required fields
+    if (!data.name || !data.address || !data.price ||!data.description || !data.totalSlots || !data.ownerId) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    }
+
+    const result = await adminDbService.plots.updatePlot(plotId,data);
+    console.log("update plot result:", result)
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 400 })
+    }
+
+    return NextResponse.json(result.data, { status: 201 })
+  } catch (error) {
+    console.error("Error updating plot:", error)
+    return NextResponse.json({ error: "Failed to pdate plot: " + error.message }, { status: 500 })
   }
 }

@@ -68,20 +68,20 @@ export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) 
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e) => {
+  const handleCardPayment = (e) => {
     e.preventDefault()
     if (!validateForm()) return
 
     const options = {
-     key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,// Razorpay Key ID
-      amount: amount * 100, // amount in paise
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      amount: amount * 100,
       currency: "INR",
       name: "Vehicle Parking App",
       description: "Slot Booking Payment",
       handler: function (response) {
-        // Success callback
         onSubmit({
           razorpay_payment_id: response.razorpay_payment_id,
+          method: "card",
           cardName,
           cardNumber: cardNumber.replace(/\s+/g, ""),
           expiryDate,
@@ -94,11 +94,10 @@ export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) 
         contact: "9999999999",
       },
       method: {
-    upi: true,         // ✅ Enable UPI
-    card: true,        // Optional, you can disable others
-    netbanking: true,
-  },
-
+        upi: true,
+        card: true,
+        netbanking: true,
+      },
       theme: {
         color: "#0f172a",
       },
@@ -108,101 +107,160 @@ export function PaymentForm({ amount, onSubmit, onCancel, processing = false }) 
     rzp.open()
   }
 
+  const handleUPIPayment = () => {
+    const options = {
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      amount: amount * 100,
+      currency: "INR",
+      name: "Vehicle Parking App",
+      description: "Slot Booking - UPI Payment",
+      handler: function (response) {
+        onSubmit({
+          razorpay_payment_id: response.razorpay_payment_id,
+          method: "upi"
+        })
+      },
+      method: {
+        upi: true,
+      },
+      prefill: {
+        name: "UPI Customer",
+        email: "test@example.com",
+        contact: "9999999999"
+      },
+      theme: {
+        color: "#0f172a"
+      }
+    }
+
+    const rzp = new window.Razorpay(options)
+    rzp.open()
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="cardNumber">Card Number</Label>
-        <div className="relative">
-          <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            id="cardNumber"
-            placeholder="1234 5678 9012 3456"
-            value={cardNumber}
-            onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-            className="pl-10"
-            maxLength={19}
-          />
-        </div>
-        {errors.cardNumber && <p className="text-sm text-red-500">{errors.cardNumber}</p>}
+    <div className="space-y-6">
+      {/* UPI Payment Block */}
+      <div className="text-center border rounded-lg p-4 shadow-sm">
+        <p className="font-semibold mb-2">Prefer UPI?</p>
+         <div className="flex justify-center gap-4 items-center mb-3">
+    <img src="https://cdn.razorpay.com/app/gpay.svg" alt="GPay" className="h-8 w-8" />
+    <img src="https://cdn.razorpay.com/app/phonepe.svg" alt="PhonePe" className="h-8 w-8" />
+    <img src="https://cdn.razorpay.com/app/paytm.svg" alt="Paytm" className="h-8 w-8" />
+    <img src="https://cdn.razorpay.com/app/bhim.svg" alt="BHIM" className="h-8 w-8" />
+  </div>
+        <Button
+          type="button"
+          className="w-full bg-green-600 hover:bg-green-700"
+          onClick={handleUPIPayment}
+        >
+          Pay with UPI (GPay / PhonePe / BHIM)
+        </Button>
+        <p className="text-xs text-muted-foreground mt-2">
+          Scan QR or select your UPI app after clicking the button.
+        </p>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="cardName">Cardholder Name</Label>
-        <Input id="cardName" placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
-        {errors.cardName && <p className="text-sm text-red-500">{errors.cardName}</p>}
+      {/* Divider */}
+      <div className="relative text-center">
+        <div className="my-4 text-sm text-muted-foreground">OR</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      {/* Card Payment Form */}
+      <form onSubmit={handleCardPayment} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="expiryDate">Expiry Date</Label>
+          <Label htmlFor="cardNumber">Card Number</Label>
           <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <CreditCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              id="expiryDate"
-              placeholder="MM/YY"
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
+              id="cardNumber"
+              placeholder="1234 5678 9012 3456"
+              value={cardNumber}
+              onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
               className="pl-10"
-              maxLength={5}
+              maxLength={19}
             />
           </div>
-          {errors.expiryDate && <p className="text-sm text-red-500">{errors.expiryDate}</p>}
+          {errors.cardNumber && <p className="text-sm text-red-500">{errors.cardNumber}</p>}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="cvv">CVV</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="cvv"
-              placeholder="123"
-              value={cvv}
-              onChange={(e) => setCvv(e.target.value.replace(/[^0-9]/g, ""))}
-              className="pl-10"
-              maxLength={4}
-              type="password"
-            />
-          </div>
-          {errors.cvv && <p className="text-sm text-red-500">{errors.cvv}</p>}
+          <Label htmlFor="cardName">Cardholder Name</Label>
+          <Input id="cardName" placeholder="John Doe" value={cardName} onChange={(e) => setCardName(e.target.value)} />
+          {errors.cardName && <p className="text-sm text-red-500">{errors.cardName}</p>}
         </div>
-      </div>
 
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="payment-methods">
-          <AccordionTrigger className="text-sm">Other Payment Methods</AccordionTrigger>
-          <AccordionContent>
-            <div className="space-y-2 pt-2">
-              <Button variant="outline" className="w-full justify-start" type="button" disabled>
-                Pay with PayPal
-              </Button>
-              <Button variant="outline" className="w-full justify-start" type="button" disabled>
-                Apple Pay
-              </Button>
-              <p className="text-xs text-muted-foreground text-center mt-2">Additional payment methods coming soon</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="expiryDate">Expiry Date</Label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="expiryDate"
+                placeholder="MM/YY"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(formatExpiryDate(e.target.value))}
+                className="pl-10"
+                maxLength={5}
+              />
             </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+            {errors.expiryDate && <p className="text-sm text-red-500">{errors.expiryDate}</p>}
+          </div>
 
-      <div className="pt-2 flex flex-col space-y-2">
-        <Button type="submit" className="w-full" disabled={processing}>
-          {processing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            `Pay ₹${amount.toFixed(2)}`
-          )}
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel} disabled={processing}>
-          Cancel
-        </Button>
-      </div>
+          <div className="space-y-2">
+            <Label htmlFor="cvv">CVV</Label>
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="cvv"
+                placeholder="123"
+                value={cvv}
+                onChange={(e) => setCvv(e.target.value.replace(/[^0-9]/g, ""))}
+                className="pl-10"
+                maxLength={4}
+                type="password"
+              />
+            </div>
+            {errors.cvv && <p className="text-sm text-red-500">{errors.cvv}</p>}
+          </div>
+        </div>
 
-      <div className="text-xs text-center text-muted-foreground">
-        <p>Payment is powered by Razorpay. Use test card details if enabled in test mode.</p>
-      </div>
-    </form>
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="payment-methods">
+            <AccordionTrigger className="text-sm">Other Payment Methods</AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-2 pt-2">
+                <Button variant="outline" className="w-full justify-start" type="button" disabled>
+                  Pay with PayPal
+                </Button>
+                <Button variant="outline" className="w-full justify-start" type="button" disabled>
+                  Apple Pay
+                </Button>
+                <p className="text-xs text-muted-foreground text-center mt-2">Additional payment methods coming soon</p>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+
+        <div className="pt-2 flex flex-col space-y-2">
+          <Button type="submit" className="w-full" disabled={processing}>
+            {processing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              `Pay ₹${amount.toFixed(2)}`
+            )}
+          </Button>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={processing}>
+            Cancel
+          </Button>
+        </div>
+
+        <div className="text-xs text-center text-muted-foreground">
+          <p>Payment is powered by Razorpay. Use test card details if enabled in test mode.</p>
+        </div>
+      </form>
+    </div>
   )
 }

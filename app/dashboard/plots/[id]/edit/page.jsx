@@ -11,10 +11,28 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Upload, X, Trash2 } from "lucide-react"
+import { Loader2, X, Trash2, ImageIcon, FileText } from "lucide-react"
 import { useAuth } from "@/lib/firebase/auth-context"
 import { useFirebase } from "@/lib/firebase/firebase-provider"
 import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api"
+import {
+  uploadMultipleFiles,
+  deleteMultipleFiles,
+  formatFileSize,
+  isImageFile,
+  isDocumentFile,
+} from "@/lib/firebase/storage-utils"
+import { Progress } from "@/components/ui/progress"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const formSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters" }),
@@ -23,21 +41,6 @@ const formSchema = z.object({
   price: z.coerce.number().positive({ message: "Price must be a positive number" }),
   totalSlots: z.coerce.number().int().positive({ message: "Total slots must be a positive integer" }),
 })
-
-// Dummy plot data
-const dummyPlot = {
-  id: "plot1",
-  name: "Downtown Parking",
-  address: "123 Main St, Downtown",
-  description: "Conveniently located parking in the heart of downtown. Easy access to shops, restaurants, and offices.",
-  price: 5,
-  availableSlots: 8,
-  totalSlots: 15,
-  lat: 40.7128,
-  lng: -74.006,
-  images: ["/placeholder.svg?height=300&width=500", "/placeholder.svg?height=300&width=500"],
-  features: ["24/7 Access", "Security Cameras", "Covered Parking"],
-}
 
 const mapContainerStyle = {
   width: "100%",
@@ -59,8 +62,21 @@ export default function EditPlotPage() {
   const [plot, setPlot] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [images, setImages] = useState([])
-  const [imageUrls, setImageUrls] = useState([])
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+  // Image handling
+  const [existingImages, setExistingImages] = useState([])
+  const [newImages, setNewImages] = useState([])
+  const [newImagePreviews, setNewImagePreviews] = useState([])
+  const [imagesToDelete, setImagesToDelete] = useState([])
+
+  // Document handling
+  const [existingDocuments, setExistingDocuments] = useState([])
+  const [newDocuments, setNewDocuments] = useState([])
+  const [newDocumentInfo, setNewDocumentInfo] = useState([])
+  const [documentsToDelete, setDocumentsToDelete] = useState([])
+
   const [markerPosition, setMarkerPosition] = useState(null)
 
   const { isLoaded } = useJsApiLoader({
@@ -76,41 +92,49 @@ export default function EditPlotPage() {
       description: "",
       price: 0,
       totalSlots: 0,
-      
     },
   })
 
   useEffect(() => {
     const fetchPlot = async () => {
       try {
-        // In a real app, you would fetch from Firestore
-        // const docRef = doc(db, "plots", params.id)
-        // const docSnap = await getDoc(docRef)
-        // if (docSnap.exists()) {
-        //   const plotData = { id: docSnap.id, ...docSnap.data() }
-        //   setPlot(plotData)
-        //   form.reset({
-        //     name: plotData.name,
-        //     address: plotData.address,
-        //     description: plotData.description,
-        //     price: plotData.price,
-        //     totalSlots: plotData.totalSlots,
-        //   })
-        //   setImageUrls(plotData.images || [])
-        //   setMarkerPosition({ lat: plotData.lat, lng: plotData.lng })
-        // }
+        if (!params.id) return
 
-        // For demo, use dummy data
-        setPlot(dummyPlot)
+        const response = await fetch(`/api/plots/${params.id}`)
+        if (!response.ok) {
+          throw new Error("Failed to fetch plot")
+        }
+
+        const data = await response.json()
+        if (!data.success) {
+          throw new Error(data.error || "Failed to fetch plot")
+        }
+
+        const plotData = data.data
+        setPlot(plotData)
+
+        // Set form values
         form.reset({
-          name: dummyPlot.name,
-          address: dummyPlot.address,
-          description: dummyPlot.description,
-          price: dummyPlot.price,
-          totalSlots: dummyPlot.totalSlots,
+          name: plotData.name,
+          address: plotData.address,
+          description: plotData.description,
+          price: plotData.price,
+          totalSlots: plotData.totalSlots,
         })
-        setImageUrls(dummyPlot.images || [])
-        setMarkerPosition({ lat: dummyPlot.lat, lng: dummyPlot.lng })
+
+        // Set images and documents
+        if (plotData.images && Array.isArray(plotData.images)) {
+          setExistingImages(plotData.images)
+        }
+
+        if (plotData.documents && Array.isArray(plotData.documents)) {
+          setExistingDocuments(plotData.documents)
+        }
+
+        // Set marker position
+        if (plotData.lat && plotData.lng) {
+          setMarkerPosition({ lat: plotData.lat, lng: plotData.lng })
+        }
       } catch (error) {
         console.error("Error fetching plot:", error)
         toast({
@@ -126,24 +150,64 @@ export default function EditPlotPage() {
     if (params.id) {
       fetchPlot()
     }
-  }, [params.id, form, toast, db])
+  }, [params.id, form, toast])
 
-  const handleImageChange = (e) => {
+  const handleNewImageChange = (e) => {
     if (e.target.files) {
-      const newFiles = Array.from(e.target.files)
-      setImages((prev) => [...prev, ...newFiles])
+      const files = Array.from(e.target.files).filter((file) => isImageFile(file.name))
+      setNewImages((prev) => [...prev, ...files])
 
-      // Create preview URLs for the images
-      newFiles.forEach((file) => {
+      // Create preview URLs
+      files.forEach((file) => {
         const url = URL.createObjectURL(file)
-        setImageUrls((prev) => [...prev, url])
+        setNewImagePreviews((prev) => [...prev, url])
       })
     }
   }
 
-  const removeImage = (index) => {
-    setImages((prev) => prev.filter((_, i) => i !== index))
-    setImageUrls((prev) => prev.filter((_, i) => i !== index))
+  const handleNewDocumentChange = (e) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files).filter((file) => isDocumentFile(file.name))
+      setNewDocuments((prev) => [...prev, ...files])
+
+      // Store document info
+      files.forEach((file) => {
+        setNewDocumentInfo((prev) => [
+          ...prev,
+          {
+            name: file.name,
+            size: formatFileSize(file.size),
+            type: file.type,
+          },
+        ])
+      })
+    }
+  }
+
+  const removeExistingImage = (index) => {
+    const imageToRemove = existingImages[index]
+    setImagesToDelete((prev) => [...prev, imageToRemove])
+    setExistingImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const removeNewImage = (index) => {
+    setNewImages((prev) => prev.filter((_, i) => i !== index))
+    setNewImagePreviews((prev) => {
+      // Revoke the object URL to avoid memory leaks
+      URL.revokeObjectURL(prev[index])
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  const removeExistingDocument = (index) => {
+    const docToRemove = existingDocuments[index]
+    setDocumentsToDelete((prev) => [...prev, docToRemove])
+    setExistingDocuments((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const removeNewDocument = (index) => {
+    setNewDocuments((prev) => prev.filter((_, i) => i !== index))
+    setNewDocumentInfo((prev) => prev.filter((_, i) => i !== index))
   }
 
   const onMapClick = (e) => {
@@ -164,20 +228,74 @@ export default function EditPlotPage() {
     }
 
     setIsSubmitting(true)
+    setUploadProgress(10)
 
     try {
-      // In a real app, you would update in Firestore
-      // const docRef = doc(db, "plots", params.id)
-      // await updateDoc(docRef, {
-      //   name: values.name,
-      //   address: values.address,
-      //   description: values.description,
-      //   price: values.price,
-      //   totalSlots: values.totalSlots,
-      //   lat: markerPosition.lat,
-      //   lng: markerPosition.lng,
-      //   updatedAt: new Date().toISOString(),
-      // })
+      // 1. Upload new images
+      let uploadedNewImages = []
+      if (newImages.length > 0) {
+        uploadedNewImages = await uploadMultipleFiles(newImages, "plots/images", user.uid, (progress) => {
+          setUploadProgress(10 + progress * 0.3) // 10-40% progress for images
+        })
+      }
+
+      // 2. Upload new documents
+      let uploadedNewDocuments = []
+      if (newDocuments.length > 0) {
+        uploadedNewDocuments = await uploadMultipleFiles(newDocuments, "plots/documents", user.uid, (progress) => {
+          setUploadProgress(40 + progress * 0.3) // 40-70% progress for documents
+        })
+      }
+
+      // 3. Delete removed images
+      if (imagesToDelete.length > 0) {
+        const imagePathsToDelete = imagesToDelete
+          .filter((img) => img.path) // Only delete images with storage paths
+          .map((img) => img.path)
+
+        if (imagePathsToDelete.length > 0) {
+          await deleteMultipleFiles(imagePathsToDelete)
+        }
+      }
+
+      // 4. Delete removed documents
+      if (documentsToDelete.length > 0) {
+        const documentPathsToDelete = documentsToDelete
+          .filter((doc) => doc.path) // Only delete documents with storage paths
+          .map((doc) => doc.path)
+
+        if (documentPathsToDelete.length > 0) {
+          await deleteMultipleFiles(documentPathsToDelete)
+        }
+      }
+
+      setUploadProgress(80)
+
+      // 5. Update plot data
+      const updatedPlotData = {
+        ...values,
+        lat: markerPosition?.lat || plot.lat,
+        lng: markerPosition?.lng || plot.lng,
+        images: [...existingImages, ...uploadedNewImages],
+        documents: [...existingDocuments, ...uploadedNewDocuments],
+        updatedAt: new Date().toISOString(),
+      }
+
+      // 6. Send update to API
+      const response = await fetch(`/api/plots/${params.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedPlotData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to update plot")
+      }
+
+      setUploadProgress(100)
 
       toast({
         title: "Plot Updated Successfully",
@@ -198,26 +316,57 @@ export default function EditPlotPage() {
   }
 
   const handleDelete = async () => {
-    if (confirm("Are you sure you want to delete this parking plot? This action cannot be undone.")) {
-      try {
-        // In a real app, you would delete from Firestore
-        // const docRef = doc(db, "plots", params.id)
-        // await deleteDoc(docRef)
+    setShowDeleteDialog(true)
+  }
 
-        toast({
-          title: "Plot Deleted",
-          description: "Your parking plot has been deleted.",
-        })
+  const confirmDelete = async () => {
+    try {
+      setIsSubmitting(true)
 
-        router.push("/dashboard/plots")
-      } catch (error) {
-        console.error("Error deleting plot:", error)
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "There was an error deleting your parking plot. Please try again.",
-        })
+      // 1. Delete all images from storage
+      if (existingImages.length > 0) {
+        const imagePathsToDelete = existingImages.filter((img) => img.path).map((img) => img.path)
+
+        if (imagePathsToDelete.length > 0) {
+          await deleteMultipleFiles(imagePathsToDelete)
+        }
       }
+
+      // 2. Delete all documents from storage
+      if (existingDocuments.length > 0) {
+        const documentPathsToDelete = existingDocuments.filter((doc) => doc.path).map((doc) => doc.path)
+
+        if (documentPathsToDelete.length > 0) {
+          await deleteMultipleFiles(documentPathsToDelete)
+        }
+      }
+
+      // 3. Delete plot from database
+      const response = await fetch(`/api/plots/${params.id}`, {
+        method: "DELETE",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to delete plot")
+      }
+
+      toast({
+        title: "Plot Deleted",
+        description: "Your parking plot has been deleted.",
+      })
+
+      router.push("/dashboard/plots")
+    } catch (error) {
+      console.error("Error deleting plot:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "There was an error deleting your parking plot. Please try again.",
+      })
+    } finally {
+      setIsSubmitting(false)
+      setShowDeleteDialog(false)
     }
   }
 
@@ -321,7 +470,7 @@ export default function EditPlotPage() {
                     name="price"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Price per Hour (₹)</FormLabel>
+                        <FormLabel>Price per Hour ($)</FormLabel>
                         <FormControl>
                           <Input type="number" min="0" step="0.5" {...field} />
                         </FormControl>
@@ -343,48 +492,169 @@ export default function EditPlotPage() {
                       </FormItem>
                     )}
                   />
+                </CardContent>
+              </Card>
+            </div>
 
-                  <div>
-                    <FormLabel>Current Images</FormLabel>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {imageUrls.map((url, index) => (
-                        <div key={index} className="relative rounded-md overflow-hidden">
-                          <img
-                            src={url || "/placeholder.svg"}
-                            alt={`Plot image ${index + 1}`}
-                            className="w-full h-24 object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(index)}
-                            className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1"
-                          >
-                            <X className="h-4 w-4 text-white" />
-                          </button>
-                        </div>
-                      ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Images</CardTitle>
+                  <CardDescription>Update plot images</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Existing Images */}
+                  {existingImages.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Current Images</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {existingImages.map((image, index) => (
+                          <div key={index} className="relative rounded-md overflow-hidden">
+                            <img
+                              src={image.url || "/placeholder.svg"}
+                              alt={`Plot image ${index + 1}`}
+                              className="w-full h-24 object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeExistingImage(index)}
+                              className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1"
+                            >
+                              <X className="h-4 w-4 text-white" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  )}
+
+                  {/* New Images */}
+                  {newImagePreviews.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">New Images</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {newImagePreviews.map((url, index) => (
+                          <div key={index} className="relative rounded-md overflow-hidden">
+                            <img
+                              src={url || "/placeholder.svg"}
+                              alt={`New image ${index + 1}`}
+                              className="w-full h-24 object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeNewImage(index)}
+                              className="absolute top-1 right-1 bg-black bg-opacity-50 rounded-full p-1"
+                            >
+                              <X className="h-4 w-4 text-white" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upload New Images */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Add More Images</h4>
+                    <label htmlFor="new-images" className="cursor-pointer">
+                      <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center">
+                        <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">Drag and drop images here or click to browse</p>
+                        <p className="text-xs text-muted-foreground mt-1">JPG, PNG or GIF, up to 5MB each</p>
+                      </div>
+                      <Input
+                        id="new-images"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={handleNewImageChange}
+                      />
+                    </label>
                   </div>
+                </CardContent>
+              </Card>
 
-                  <div>
-                    <FormLabel>Add More Images</FormLabel>
-                    <div className="mt-2">
-                      <label htmlFor="images" className="cursor-pointer">
-                        <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center">
-                          <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground">Drag and drop images here or click to browse</p>
-                          <p className="text-xs text-muted-foreground mt-1">JPG, PNG or GIF, up to 5MB each</p>
-                        </div>
-                        <Input
-                          id="images"
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={handleImageChange}
-                        />
-                      </label>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Documents</CardTitle>
+                  <CardDescription>Update plot documents</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Existing Documents */}
+                  {existingDocuments.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Current Documents</h4>
+                      <div className="space-y-2">
+                        {existingDocuments.map((doc, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              <div>
+                                <p className="text-sm font-medium truncate max-w-[200px]">{doc.name}</p>
+                                <p className="text-xs text-muted-foreground">{formatFileSize(doc.size || 0)}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeExistingDocument(index)}
+                              className="text-destructive hover:text-destructive/80"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+                  )}
+
+                  {/* New Documents */}
+                  {newDocumentInfo.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">New Documents</h4>
+                      <div className="space-y-2">
+                        {newDocumentInfo.map((doc, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4" />
+                              <div>
+                                <p className="text-sm font-medium truncate max-w-[200px]">{doc.name}</p>
+                                <p className="text-xs text-muted-foreground">{doc.size}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeNewDocument(index)}
+                              className="text-destructive hover:text-destructive/80"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Upload New Documents */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Add More Documents</h4>
+                    <label htmlFor="new-documents" className="cursor-pointer">
+                      <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center">
+                        <FileText className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          Upload ownership documents, permits, or certificates
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">PDF, DOC, or DOCX, up to 10MB each</p>
+                      </div>
+                      <Input
+                        id="new-documents"
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        multiple
+                        className="hidden"
+                        onChange={handleNewDocumentChange}
+                      />
+                    </label>
                   </div>
                 </CardContent>
               </Card>
@@ -434,8 +704,18 @@ export default function EditPlotPage() {
               </CardContent>
             </Card>
 
+            {isSubmitting && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Processing...</span>
+                  <span>{Math.round(uploadProgress)}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-2" />
+              </div>
+            )}
+
             <div className="flex justify-between gap-4">
-              <Button type="button" variant="destructive" onClick={handleDelete}>
+              <Button type="button" variant="destructive" onClick={handleDelete} disabled={isSubmitting}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete Plot
               </Button>
@@ -458,6 +738,30 @@ export default function EditPlotPage() {
           </form>
         </Form>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this parking plot?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your parking plot and all associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

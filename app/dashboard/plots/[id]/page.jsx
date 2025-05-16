@@ -33,9 +33,13 @@ import { VehicleSelector } from "@/components/vehicles/vehicle-selector"
 // Add this new component after the imports and before the generateTimeSlots function
 function ImageGallery({ images }) {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [imageError, setImageError] = useState({})
+
+  // Process images to handle both string URLs and object formats
+  const processedImages = images?.map((img) => (typeof img === "object" ? img.url : img)) || []
 
   // If no images are provided, show a placeholder
-  if (!images || images.length === 0) {
+  if (!processedImages || processedImages.length === 0) {
     return (
       <div className="h-[300px] w-full bg-muted flex items-center justify-center rounded-t-md">
         <Car className="h-16 w-16 text-muted-foreground opacity-30" />
@@ -44,22 +48,40 @@ function ImageGallery({ images }) {
   }
 
   const nextImage = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % images.length)
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % processedImages.length)
   }
 
   const prevImage = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + images.length) % images.length)
+    setCurrentIndex((prevIndex) => (prevIndex - 1 + processedImages.length) % processedImages.length)
   }
+
+  const handleImageError = (imageUrl) => {
+    console.error("Failed to load image:", imageUrl)
+    setImageError((prev) => ({ ...prev, [imageUrl]: true }))
+  }
+
+  // Check if current image has an error
+  const currentImageHasError = imageError[processedImages[currentIndex]]
 
   return (
     <div className="relative h-[300px] w-full">
-      <img
-        src={images[currentIndex] || "/placeholder.svg"}
-        alt={`Parking spot image ${currentIndex + 1}`}
-        className="h-full w-full object-cover rounded-t-md"
-      />
+      {currentImageHasError ? (
+        <div className="h-full w-full bg-muted flex items-center justify-center rounded-t-md">
+          <div className="text-center">
+            <Car className="h-16 w-16 text-muted-foreground opacity-30 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">Image not available</p>
+          </div>
+        </div>
+      ) : (
+        <img
+          src={processedImages[currentIndex] || "/placeholder.svg"}
+          alt={`Parking spot image ${currentIndex + 1}`}
+          className="h-full w-full object-cover rounded-t-md"
+          onError={() => handleImageError(processedImages[currentIndex])}
+        />
+      )}
 
-      {images.length > 1 && (
+      {processedImages.length > 1 && (
         <>
           <button
             onClick={prevImage}
@@ -76,11 +98,13 @@ function ImageGallery({ images }) {
             <ChevronRight className="h-6 w-6" />
           </button>
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-            {images.map((_, index) => (
+            {processedImages.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentIndex(index)}
-                className={`h-2 w-2 rounded-full transition-colors ${index === currentIndex ? "bg-white" : "bg-white/50"}`}
+                className={`h-2 w-2 rounded-full transition-colors ${
+                  index === currentIndex ? "bg-white" : "bg-white/50"
+                }`}
                 aria-label={`Go to image ${index + 1}`}
               />
             ))}

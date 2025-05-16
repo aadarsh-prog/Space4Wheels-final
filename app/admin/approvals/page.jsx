@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { useAuth } from "@/lib/firebase/auth-context"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -35,6 +34,7 @@ export default function PlotApprovalsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null)
   const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false)
+  const [imageError, setImageError] = useState({})
 
   useEffect(() => {
     // Redirect if not an admin
@@ -52,7 +52,7 @@ export default function PlotApprovalsPage() {
         setIsLoading(true)
 
         // Fetch pending plots
-        const pendingResponse = await fetch("/api/admin/plots/status?status=pending")
+        const pendingResponse = await fetch("/api/admin/plots/pending")
         if (!pendingResponse.ok) {
           throw new Error("Failed to fetch pending plots")
         }
@@ -186,103 +186,19 @@ export default function PlotApprovalsPage() {
     setIsImagePreviewOpen(true)
   }
 
-  // For demo purposes, let's create some dummy plots with images and documents
-  const dummyPendingPlots = [
-    {
-      id: "plot1",
-      name: "Downtown Parking",
-      address: "123 Main St, Downtown",
-      ownerId: "owner1",
-      ownerName: "John Smith",
-      price: 5,
-      totalSlots: 15,
-      description: "Conveniently located parking in the heart of downtown.",
-      approvalStatus: "pending",
-      createdAt: "2023-05-10T10:30:00Z",
-      images: ["/placeholder.svg?height=300&width=500", "/placeholder.svg?height=300&width=500"],
-      documents: [
-        {
-          name: "Property Deed",
-          url: "#property-deed",
-        },
-        {
-          name: "Business License",
-          url: "#business-license",
-        },
-      ],
-    },
-    {
-      id: "plot2",
-      name: "Central Mall Parking",
-      address: "456 Market Ave, Central",
-      ownerId: "owner2",
-      ownerName: "Jane Doe",
-      price: 7,
-      totalSlots: 30,
-      description: "Spacious parking near the Central Mall with security.",
-      approvalStatus: "pending",
-      createdAt: "2023-05-09T14:20:00Z",
-      images: ["/placeholder.svg?height=300&width=500"],
-      documents: [
-        {
-          name: "Ownership Certificate",
-          url: "#ownership-certificate",
-        },
-      ],
-    },
-  ]
+  const handleImageError = (imageUrl) => {
+    console.error("Failed to load image:", imageUrl)
+    setImageError((prev) => ({ ...prev, [imageUrl]: true }))
+  }
 
-  const dummyApprovedPlots = [
-    {
-      id: "plot3",
-      name: "City Center Parking",
-      address: "789 Center Blvd, Midtown",
-      ownerId: "owner3",
-      ownerName: "Mike Johnson",
-      price: 6,
-      totalSlots: 20,
-      description: "Secure parking in the city center with 24/7 access.",
-      approvalStatus: "approved",
-      createdAt: "2023-05-08T09:15:00Z",
-      approvedAt: "2023-05-09T10:00:00Z",
-      images: ["/placeholder.svg?height=300&width=500"],
-      documents: [
-        {
-          name: "Property Documents",
-          url: "#property-documents",
-        },
-      ],
-    },
-  ]
 
-  const dummyRejectedPlots = [
-    {
-      id: "plot4",
-      name: "Riverside Parking",
-      address: "321 River Rd, Eastside",
-      ownerId: "owner1",
-      ownerName: "John Smith",
-      price: 4,
-      totalSlots: 25,
-      description: "Parking space near the riverside.",
-      approvalStatus: "rejected",
-      rejectionReason: "Insufficient documentation provided.",
-      createdAt: "2023-05-07T11:45:00Z",
-      rejectedAt: "2023-05-08T13:30:00Z",
-      images: ["/placeholder.svg?height=300&width=500"],
-      documents: [
-        {
-          name: "Incomplete Documents",
-          url: "#incomplete-documents",
-        },
-      ],
-    },
-  ]
+  
+  
 
   // Use dummy data if no real data is available
-  const displayPendingPlots = pendingPlots.length > 0 ? pendingPlots : dummyPendingPlots
-  const displayApprovedPlots = approvedPlots.length > 0 ? approvedPlots : dummyApprovedPlots
-  const displayRejectedPlots = rejectedPlots.length > 0 ? rejectedPlots : dummyRejectedPlots
+  const displayPendingPlots = pendingPlots
+  const displayApprovedPlots = approvedPlots
+  const displayRejectedPlots = rejectedPlots
 
   if (isLoading) {
     return (
@@ -344,7 +260,7 @@ export default function PlotApprovalsPage() {
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
                               <span className="text-muted-foreground">Price: </span>
-                              <span className="font-medium">₹{plot.price}/hour</span>
+                              <span className="font-medium">${plot.price}/hour</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Total Slots: </span>
@@ -363,20 +279,32 @@ export default function PlotApprovalsPage() {
                         <div>
                           <h3 className="text-sm font-medium text-muted-foreground mb-2">Images</h3>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                            {plot.images.map((image, index) => (
-                              <div
-                                key={index}
-                                className="relative aspect-video bg-muted rounded-md overflow-hidden cursor-pointer"
-                                onClick={() => openImagePreview(image)}
-                              >
-                                <Image
-                                  src={image || "/placeholder.svg"}
-                                  alt={`Plot image ${index + 1}`}
-                                  fill
-                                  className="object-cover"
-                                />
-                              </div>
-                            ))}
+                            {plot.images.map((image, index) => {
+                              // Check if image is an object with url property or just a string
+                              const imageUrl = typeof image === "object" ? image.url : image
+                              const hasError = imageError[imageUrl]
+
+                              return (
+                                <div
+                                  key={index}
+                                  className="relative aspect-video bg-muted rounded-md overflow-hidden cursor-pointer"
+                                  onClick={() => !hasError && openImagePreview(imageUrl)}
+                                >
+                                  {hasError ? (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                                      <p className="text-xs text-gray-500">Image not available</p>
+                                    </div>
+                                  ) : (
+                                    <img
+                                      src={imageUrl || "/placeholder.svg"}
+                                      alt={`Plot image ${index + 1}`}
+                                      className="object-cover w-full h-full"
+                                      onError={() => handleImageError(imageUrl)}
+                                    />
+                                  )}
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )}
@@ -386,20 +314,26 @@ export default function PlotApprovalsPage() {
                         <div>
                           <h3 className="text-sm font-medium text-muted-foreground mb-2">Documents</h3>
                           <div className="space-y-2">
-                            {plot.documents.map((doc, index) => (
-                              <div key={index} className="flex items-center gap-2 p-2 border rounded-md">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                <span className="flex-1 text-sm">{doc.name}</span>
-                                <a
-                                  href={doc.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-1 text-xs text-primary hover:underline"
-                                >
-                                  View <ExternalLink className="h-3 w-3" />
-                                </a>
-                              </div>
-                            ))}
+                            {plot.documents.map((doc, index) => {
+                              // Check if doc is an object with url property or just a string
+                              const docUrl = typeof doc === "object" ? doc.url : doc
+                              const docName = typeof doc === "object" ? doc.name : `Document ${index + 1}`
+
+                              return (
+                                <div key={index} className="flex items-center gap-2 p-2 border rounded-md">
+                                  <FileText className="h-4 w-4 text-muted-foreground" />
+                                  <span className="flex-1 text-sm">{docName}</span>
+                                  <a
+                                    href={docUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                                  >
+                                    View <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )}
@@ -476,7 +410,7 @@ export default function PlotApprovalsPage() {
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
                               <span className="text-muted-foreground">Price: </span>
-                              <span className="font-medium">₹{plot.price}/hour</span>
+                              <span className="font-medium">${plot.price}/hour</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Total Slots: </span>
@@ -490,14 +424,29 @@ export default function PlotApprovalsPage() {
                       {plot.images && plot.images.length > 0 && (
                         <div
                           className="relative aspect-video w-full max-w-md mx-auto bg-muted rounded-md overflow-hidden cursor-pointer"
-                          onClick={() => openImagePreview(plot.images[0])}
+                          onClick={() => {
+                            const imageUrl = typeof plot.images[0] === "object" ? plot.images[0].url : plot.images[0]
+                            if (!imageError[imageUrl]) {
+                              openImagePreview(imageUrl)
+                            }
+                          }}
                         >
-                          <Image
-                            src={plot.images[0] || "/placeholder.svg"}
-                            alt={`Plot image`}
-                            fill
-                            className="object-cover"
-                          />
+                          {imageError[typeof plot.images[0] === "object" ? plot.images[0].url : plot.images[0]] ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                              <p className="text-sm text-gray-500">Image not available</p>
+                            </div>
+                          ) : (
+                            <img
+                              src={typeof plot.images[0] === "object" ? plot.images[0].url : plot.images[0]}
+                              alt={`Plot image`}
+                              className="object-cover w-full h-full"
+                              onError={() =>
+                                handleImageError(
+                                  typeof plot.images[0] === "object" ? plot.images[0].url : plot.images[0],
+                                )
+                              }
+                            />
+                          )}
                         </div>
                       )}
 
@@ -559,7 +508,7 @@ export default function PlotApprovalsPage() {
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
                               <span className="text-muted-foreground">Price: </span>
-                              <span className="font-medium">₹{plot.price}/hour</span>
+                              <span className="font-medium">${plot.price}/hour</span>
                             </div>
                             <div>
                               <span className="text-muted-foreground">Total Slots: </span>
@@ -640,13 +589,18 @@ export default function PlotApprovalsPage() {
             <DialogTitle>Image Preview</DialogTitle>
           </DialogHeader>
           <div className="relative aspect-video w-full">
-            {imagePreviewUrl && (
-              <Image
+            {imagePreviewUrl && !imageError[imagePreviewUrl] && (
+              <img
                 src={imagePreviewUrl || "/placeholder.svg"}
                 alt="Plot image preview"
-                fill
-                className="object-contain"
+                className="w-full h-full object-contain"
+                onError={() => handleImageError(imagePreviewUrl)}
               />
+            )}
+            {imagePreviewUrl && imageError[imagePreviewUrl] && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                <p className="text-gray-500">Failed to load image</p>
+              </div>
             )}
           </div>
           <DialogFooter>

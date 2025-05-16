@@ -11,11 +11,12 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, Upload, X, AlertCircle, MapPin, FileText } from "lucide-react"
+import { Loader2, X, AlertCircle, MapPin, FileText, ImageIcon } from "lucide-react"
 import { useAuth } from "@/lib/firebase/auth-context"
 import { useDatabase } from "@/lib/hooks/use-database"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
+import { uploadMultipleFiles, formatFileSize, isImageFile, isDocumentFile } from "@/lib/firebase/storage-utils"
 
 const formSchema = z.object({
   name: z.string().min(3, { message: "Name must be at least 3 characters" }),
@@ -48,8 +49,8 @@ export default function AddPlotPage() {
       description: "",
       price: 0,
       totalSlots: 0,
-      lat: 40.7128, // Default to NYC
-      lng: -74.006,
+      lat: 0.0, // Default to NYC
+      lng: 0.0,
     },
   })
 
@@ -65,7 +66,7 @@ export default function AddPlotPage() {
 
   const handleImageChange = (e) => {
     if (e.target.files) {
-      const newFiles = Array.from(e.target.files)
+      const newFiles = Array.from(e.target.files).filter((file) => isImageFile(file.name))
       setImages((prev) => [...prev, ...newFiles])
 
       // Create preview URLs for the images
@@ -78,7 +79,7 @@ export default function AddPlotPage() {
 
   const handleDocumentChange = (e) => {
     if (e.target.files) {
-      const newFiles = Array.from(e.target.files)
+      const newFiles = Array.from(e.target.files).filter((file) => isDocumentFile(file.name))
       setDocuments((prev) => [...prev, ...newFiles])
 
       // Store document info
@@ -95,15 +96,13 @@ export default function AddPlotPage() {
     }
   }
 
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return bytes + " bytes"
-    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB"
-    else return (bytes / 1048576).toFixed(1) + " MB"
-  }
-
   const removeImage = (index) => {
     setImages((prev) => prev.filter((_, i) => i !== index))
-    setImageUrls((prev) => prev.filter((_, i) => i !== index))
+    setImageUrls((prev) => {
+      // Revoke the object URL to avoid memory leaks
+      URL.revokeObjectURL(prev[index])
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   const removeDocument = (index) => {
@@ -191,22 +190,22 @@ export default function AddPlotPage() {
 
     try {
       // Upload images to Firebase Storage
-      const uploadedImageUrls = []
-      const uploadedDocumentUrls = []
+      let uploadedImageFiles = []
+      let uploadedDocumentFiles = []
 
       if (images.length > 0) {
-        // In a real app, you would upload images to Firebase Storage
-        // For demo purposes, we'll use the preview URLs
-        uploadedImageUrls.push(...imageUrls)
+        uploadedImageFiles = await uploadMultipleFiles(images, "plots/images", user.uid, (progress) => {
+          setUploadProgress(10 + progress * 0.4) // 10-50% progress for images
+        })
       }
 
       if (documents.length > 0) {
-        // In a real app, you would upload documents to Firebase Storage
-        // For demo purposes, we'll just use the document names
-        uploadedDocumentUrls.push(...documentUrls.map((doc) => doc.name))
+        uploadedDocumentFiles = await uploadMultipleFiles(documents, "plots/documents", user.uid, (progress) => {
+          setUploadProgress(50 + progress * 0.4) // 50-90% progress for documents
+        })
       }
 
-      setUploadProgress(70)
+      setUploadProgress(90)
 
       // Add plot data to Firestore via API
       const plotData = {
@@ -219,11 +218,10 @@ export default function AddPlotPage() {
         lng: values.lng,
         ownerId: user.uid,
         ownerName: user.displayName || "Unknown",
-        images: uploadedImageUrls,
-        documents: uploadedDocumentUrls,
+        images: uploadedImageFiles,
+        documents: uploadedDocumentFiles,
         features: [],
         reviews: [],
-        status: "pending",
       }
 
       // Create plot in database via API
@@ -339,7 +337,7 @@ export default function AddPlotPage() {
                       name="price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Price per Hour (₹)</FormLabel>
+                          <FormLabel>Price per Hour ($)</FormLabel>
                           <FormControl>
                             <Input type="number" min="0" step="0.5" {...field} />
                           </FormControl>
@@ -427,7 +425,7 @@ export default function AddPlotPage() {
                   <div>
                     <label htmlFor="images" className="cursor-pointer">
                       <div className="border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center">
-                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                        <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
                         <p className="text-sm text-muted-foreground">Drag and drop images here or click to browse</p>
                         <p className="text-xs text-muted-foreground mt-1">JPG, PNG or GIF, up to 5MB each</p>
                       </div>
@@ -518,7 +516,7 @@ export default function AddPlotPage() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Uploading...</span>
-                  <span>{uploadProgress}%</span>
+                  <span>{Math.round(uploadProgress)}%</span>
                 </div>
                 <Progress value={uploadProgress} className="h-2" />
               </div>

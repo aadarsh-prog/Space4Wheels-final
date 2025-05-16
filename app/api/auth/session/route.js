@@ -12,9 +12,10 @@ export async function POST(request) {
     if (!sessionCookieResult.success) {
       return NextResponse.json({ error: "Failed to create session" }, { status: 401 })
     }
-    const resolveCookie= await cookies;
-    // Set the session cookie
-   resolveCookie().set({
+
+    // Set the session cookie - await cookies() before using set()
+    const cookieStore =await cookies()
+    cookieStore.set({
       name: "session",
       value: sessionCookieResult.sessionCookie,
       httpOnly: true,
