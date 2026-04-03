@@ -6,6 +6,7 @@ import { initAdmin } from "@/lib/firebase/firebase-admin"
 
 initAdmin()
 
+
 async function getUserFromSession() {
   const cookiesStore = await cookies()
   const sessionCookie = cookiesStore.get("session")?.value

@@ -118,31 +118,46 @@ export default function FindParkingPage() {
 
   // Get user's location on component mount
   useEffect(() => {
-    const getUserLocation = () => {
-      if (navigator.geolocation) {
-        setSearchStatus("Getting your location...")
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords
-            setUserLocation({ lat: latitude, lng: longitude })
-            setSearchStatus("Location found! Ready to search.")
-            // Auto-search when location is found
-            fetchNearbyPlots(latitude, longitude, searchRadius)
-          },
-          (error) => {
-            console.error("Error getting location:", error)
-            setSearchError("Unable to get your location. Please enter a location manually.")
-            setIsLoading(false)
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-        )
-      } else {
-        setSearchError("Geolocation is not supported by your browser. Please enter a location manually.")
-        setIsLoading(false)
-      }
-    }
+   const getUserLocation = () => {
+  if (!navigator.geolocation) {
+    setSearchError("Geolocation is not supported by your browser.")
+    setIsLoading(false)
+    return
+  }
 
-    getUserLocation()
+  setSearchStatus("Getting your location...")
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const { latitude, longitude } = position.coords
+
+      console.log("User location:", latitude, longitude)
+
+      setUserLocation({ lat: latitude, lng: longitude })
+      setSearchStatus("Location found! Ready to search.")
+
+      fetchNearbyPlots(latitude, longitude, searchRadius)
+    },
+    (error) => {
+      console.error("Geolocation error:", error)
+
+      // 🔥 FALLBACK LOCATION (VERY IMPORTANT)
+      const fallback = { lat: 22.7196, lng: 75.8577 } // Indore
+
+      setUserLocation(fallback)
+      setSearchStatus("Using default location (Indore)")
+
+      fetchNearbyPlots(fallback.lat, fallback.lng, searchRadius)
+
+      setSearchError("Location access denied. Showing default location.")
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    }
+  )
+}
 
     // Load favorites from localStorage
     const savedFavorites = localStorage.getItem("parkingFavorites")

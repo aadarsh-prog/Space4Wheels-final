@@ -21,154 +21,163 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
+  // 🔁 AUTH STATE LISTENER
   useEffect(() => {
-    // Only run this effect when Firebase is initialized
-    if (!isInitialized || !auth) {
-      console.log("Firebase auth not initialized yet")
-      return
-    }
+    if (!isInitialized || !auth) return
 
-    console.log("Firebase auth initialized, setting up auth state listener")
-    setLoading(true) // Ensure loading is true when starting auth check
-
-    const unsubscribe = onAuthStateChanged(
-      auth,
-      async (firebaseUser) => {
-        console.log("Auth state changed:", firebaseUser ? "User logged in" : "No user")
-
-        if (firebaseUser) {
-          try {
-            // Get the ID token
-            const idToken = await firebaseUser.getIdToken()
-
-            // Create or verify session on the server
-            const sessionResponse = await fetch("/api/auth/session", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ idToken }),
-            })
-
-            if (!sessionResponse.ok) {
-              console.error("Session verification failed")
-              await firebaseSignOut(auth)
-              setUser(null)
-              setLoading(false)
-              return
-            }
-
-            // Get user data including role from Firestore
-            try {
-              const userDoc = await fetch(`/api/users/${firebaseUser.uid}`)
-
-              if (!userDoc.ok) {
-                console.error("Failed to fetch user data")
-                setUser({
-                  ...firebaseUser,
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email,
-                  displayName: firebaseUser.displayName,
-                  emailVerified: firebaseUser.emailVerified,
-                  role: "user", // Default role
-                })
-              } else {
-                const userData = await userDoc.json()
-                console.log("User data fetched:", userData)
-
-                // Set the user with additional data from Firestore
-                setUser({
-                  ...firebaseUser,
-                  uid: firebaseUser.uid,
-                  email: firebaseUser.email,
-                  displayName: firebaseUser.displayName,
-                  emailVerified: firebaseUser.emailVerified,
-                  role: userData.role || "user",
-                  profile: userData,
-                })
-              }
-            } catch (error) {
-              console.error("Error fetching user data:", error)
-              // Set default user data if Firestore fetch fails
-              setUser({
-                ...firebaseUser,
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                displayName: firebaseUser.displayName,
-                emailVerified: firebaseUser.emailVerified,
-                role: "user", // Default role
-              })
-            }
-          } catch (error) {
-            console.error("Auth error:", error)
-            setUser(null)
-          }
-        } else {
-          setUser(null)
-        }
-
-        setLoading(false)
-      },
-      (error) => {
-        console.error("Auth state observer error:", error)
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
         setUser(null)
         setLoading(false)
-      },
-    )
+        return
+      }
+
+      try {
+        const idToken = await firebaseUser.getIdToken()
+
+        // ✅ Create session
+        const sessionRes = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ idToken }),
+        })
+
+        // ✅ Check ok BEFORE calling .json()
+        if (!sessionRes.ok) {
+          const text = await sessionRes.text()
+          console.error("Session creation failed:", sessionRes.status, text)
+          await firebaseSignOut(auth)
+          setUser(null)
+          setLoading(false)
+          return
+        }
+
+        const sessionData = await sessionRes.json()
+        console.log("SESSION RESPONSE:", sessionRes.status, sessionData)
+
+        // ✅ Fetch user from DB
+        let userRes = await fetch(`/api/users/${firebaseUser.uid}`)
+
+        // 🔥 Auto-create user if not found
+        if (userRes.status === 404) {
+          const createRes = await fetch("/api/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || "",
+              role: "user",
+              createdAt: new Date().toISOString(),
+            }),
+          })
+
+          // ✅ Check user creation succeeded before re-fetching
+          if (!createRes.ok) {
+            const text = await createRes.text()
+            console.error("User creation failed:", createRes.status, text)
+          }
+
+          userRes = await fetch(`/api/users/${firebaseUser.uid}`)
+        }
+
+        // ✅ Check ok before parsing
+        let userData = {}
+        if (userRes.ok) {
+          userData = await userRes.json()
+        } else {
+          const text = await userRes.text()
+          console.error("User fetch failed:", userRes.status, text)
+        }
+
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          emailVerified: firebaseUser.emailVerified,
+          role: userData.role || "user",
+          profile: userData,
+        })
+      } catch (error) {
+        console.error("Auth error:", error)
+        setUser(null)
+      }
+
+      setLoading(false)
+    })
 
     return () => unsubscribe()
-  }, [auth, isInitialized, router])
+  }, [auth, isInitialized])
 
+  // 🔐 SIGN IN
   const signIn = async (email, password) => {
-    if (!auth) {
-      console.error("Firebase auth not initialized")
-      return { success: false, error: "Authentication service not available" }
-    }
-
     try {
       setLoading(true)
-      // Use the imported signInWithEmailAndPassword function
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
 
-      // Check if email is verified
+      // ❗ Email verification check
       if (!userCredential.user.emailVerified) {
-        // Sign out the user if email is not verified
         await firebaseSignOut(auth)
         return {
           success: false,
           error: "Please verify your email before logging in.",
-          emailVerificationNeeded: true,
-          email: email,
         }
       }
 
       const idToken = await userCredential.user.getIdToken()
 
-      // Create session cookie on the server
-      const response = await fetch("/api/auth/login", {
+      // ✅ Fixed URL (was "app/api/auth/login/route.js")
+      const res = await fetch("/api/auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
       })
 
-      if (!response.ok) {
-        throw new Error("Failed to create session")
+      // ✅ Check ok BEFORE calling .json()
+      if (!res.ok) {
+        const text = await res.text()
+        console.error("Login session failed:", res.status, text)
+        throw new Error("Session creation failed")
       }
 
-      // Get user data to determine role for redirection
-      const userDoc = await fetch(`/api/users/${userCredential.user.uid}`)
+      const data = await res.json()
+      console.log("LOGIN RESPONSE:", res.status, data)
 
-      if (!userDoc.ok) {
-        // Default to user dashboard if can't fetch role
-        router.push("/auth/login")
-        return { success: true }
+      // ✅ Get user data
+      let userRes = await fetch(`/api/users/${userCredential.user.uid}`)
+
+      if (userRes.status === 404) {
+        const createRes = await fetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uid: userCredential.user.uid,
+            email: userCredential.user.email,
+            name: userCredential.user.displayName || "",
+            role: "user",
+            createdAt: new Date().toISOString(),
+          }),
+        })
+
+        if (!createRes.ok) {
+          const text = await createRes.text()
+          console.error("User creation failed:", createRes.status, text)
+        }
+
+        userRes = await fetch(`/api/users/${userCredential.user.uid}`)
       }
 
-      const userData = await userDoc.json()
+      // ✅ Check ok before parsing
+      let userData = {}
+      if (userRes.ok) {
+        userData = await userRes.json()
+      } else {
+        const text = await userRes.text()
+        console.error("User fetch failed:", userRes.status, text)
+      }
 
-      // Redirect based on role
+      // 🎯 Role-based routing
       if (userData.role === "admin") {
         router.push("/admin")
       } else if (userData.role === "owner") {
@@ -179,169 +188,109 @@ export function AuthProvider({ children }) {
 
       return { success: true }
     } catch (error) {
-      console.error("Error signing in:", error)
-      return { success: false, error: "Incorrect email or password." }
+      console.error("SignIn error:", error)
+      return { success: false, error: error.message }
     } finally {
       setLoading(false)
     }
   }
 
-  const signUp = async (email, password, name,role ) => {
-    if (!auth) {
-      console.error("Firebase auth not initialized")
-      return { success: false, error: "Authentication service not available" }
-    }
-
+  // 📝 SIGN UP
+  const signUp = async (email, password, name, role) => {
     try {
       setLoading(true)
-      // Use the imported createUserWithEmailAndPassword function
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const user = userCredential.user
 
-      // Update display name using the imported updateProfile function
       await updateProfile(user, { displayName: name })
-
-      // Send verification email
       await sendEmailVerification(user)
 
-      // Get the ID token
-      const idToken = await user.getIdToken(true)
-
-      // Create user in the database via API
-      const createUserResponse = await fetch("/api/users", {
+      // ✅ Create user in DB
+      const createRes = await fetch("/api/users", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           uid: user.uid,
           email: user.email,
-          name: name,
-          role: role,
+          name,
+          role: role || "user",
           createdAt: new Date().toISOString(),
         }),
       })
 
-      if (!createUserResponse.ok) {
-        throw new Error("Failed to create user profile")
+      if (!createRes.ok) {
+        const text = await createRes.text()
+        console.error("User creation failed during signup:", createRes.status, text)
       }
 
-      // Sign out the user after registration to force email verification
       await firebaseSignOut(auth)
 
       return {
         success: true,
         emailVerificationSent: true,
-        email: email,
+        email,
       }
     } catch (error) {
-      console.error("Error signing up:", error)
+      console.error("SignUp error:", error)
       return { success: false, error: error.message }
     } finally {
       setLoading(false)
     }
   }
 
+  // 🚪 SIGN OUT
   const signOut = async () => {
-    if (!auth) {
-      console.error("Firebase auth not initialized")
-      return { success: false, error: "Authentication service not available" }
-    }
-
     try {
       setLoading(true)
 
-      // Clear session on the server
-      await fetch("/api/auth/logout", {
-        method: "POST",
-      })
+      const logoutRes = await fetch("/api/auth/logout", { method: "POST" })
+      if (!logoutRes.ok) {
+        const text = await logoutRes.text()
+        console.error("Logout API failed:", logoutRes.status, text)
+      }
 
-      // Sign out from Firebase using the imported firebaseSignOut function
       await firebaseSignOut(auth)
-
-      // Redirect to home page
-      router.push("/components/landing-page")
-
+      router.push("/")
       return { success: true }
     } catch (error) {
-      console.error("Error signing out:", error)
+      console.error("SignOut error:", error)
       return { success: false, error: error.message }
     } finally {
       setLoading(false)
     }
   }
 
-  const resendVerificationEmail = async (email, password) => {
-    if (!auth) {
-      console.error("Firebase auth not initialized")
-      return { success: false, error: "Authentication service not available" }
-    }
-
-    try {
-      setLoading(true)
-
-      // Sign in to get the user object
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-
-      // Send verification email
-      await sendEmailVerification(userCredential.user)
-
-      // Sign out the user
-      await firebaseSignOut(auth)
-
-      return {
-        success: true,
-        message: "Verification email sent successfully.",
-      }
-    } catch (error) {
-      console.error("Error resending verification email:", error)
-      return {
-        success: false,
-        error: "Failed to resend verification email. Please check your credentials.",
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // 🔁 RESET PASSWORD
   const resetPassword = async (email) => {
-    if (!auth) {
-      console.error("Firebase auth not initialized")
-      return { success: false, error: "Authentication service not available" }
-    }
-
     try {
       setLoading(true)
       await sendPasswordResetEmail(auth, email)
-      return {
-        success: true,
-        message: "Password reset email sent successfully.",
-      }
+      return { success: true }
     } catch (error) {
-      console.error("Error sending password reset email:", error)
-      return {
-        success: false,
-        error: "Failed to send password reset email. Please check your email address.",
-      }
+      console.error("ResetPassword error:", error)
+      return { success: false, error: error.message }
     } finally {
       setLoading(false)
     }
   }
 
-  const value = {
-    user,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-    resendVerificationEmail,
-    resetPassword,
-    isInitialized,
-  }
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        resetPassword,
+        isInitialized,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
-export function useAuth() {
-  return useContext(AuthContext)
-}
+// ✅ Hook
+export const useAuth = () => useContext(AuthContext)
